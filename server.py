@@ -487,6 +487,14 @@ HTML = """
         }
         
         #stop-btn:hover { background: rgba(255, 107, 107, 0.3); }
+        
+        #restart-btn {
+            background: rgba(0, 217, 255, 0.2);
+            color: #00d9ff;
+            border: 1px solid #00d9ff;
+        }
+        
+        #restart-btn:hover { background: rgba(0, 217, 255, 0.3); }
     </style>
 </head>
 <body>
@@ -518,7 +526,7 @@ HTML = """
         </div>
         <span class="token-count" id="token-count"></span>
         <div id="channel">
-            <div class="empty">Waiting for messages...</div>
+            <div class="empty">Send a message to start the conversation...</div>
         </div>
     </div>
     
@@ -534,6 +542,7 @@ HTML = """
                     <input type="number" id="delay-seconds" value="5" min="0" max="300" step="5">
                 </div>
                 <button id="pause-btn">Pause</button>
+                <button id="restart-btn">Restart</button>
                 <button id="stop-btn">Stop</button>
             </div>
             <div class="input-row">
@@ -551,6 +560,7 @@ HTML = """
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
         const pauseBtn = document.getElementById('pause-btn');
+        const restartBtn = document.getElementById('restart-btn');
         const stopBtn = document.getElementById('stop-btn');
         const maxTokensInput = document.getElementById('max-tokens');
         const delayInput = document.getElementById('delay-seconds');
@@ -798,6 +808,17 @@ HTML = """
             await updateSettings();
         };
         
+        restartBtn.onclick = async () => {
+            try {
+                await fetch('/restart', { method: 'POST' });
+                messageCount = 0;
+                channel.innerHTML = '<div class="empty">Send a message to start the conversation...</div>';
+                updateStatus();
+            } catch (e) {
+                console.error('Failed to restart:', e);
+            }
+        };
+        
         stopBtn.onclick = async () => {
             try {
                 await fetch('/stop', { method: 'POST' });
@@ -819,7 +840,7 @@ HTML = """
             const data = JSON.parse(event.data);
             
             if (data.messages.length === 0) {
-                channel.innerHTML = '<div class="empty">Waiting for messages...</div>';
+                channel.innerHTML = '<div class="empty">Send a message to start the conversation...</div>';
                 messageCount = 0;
                 totalTokens = 0;
                 tokenCountEl.textContent = '';
@@ -1024,13 +1045,18 @@ def send():
     if not message:
         return jsonify({'error': 'Empty message'}), 400
     
-    if not os.path.exists(CHANNEL_PATH):
-        return jsonify({'error': 'No active conversation'}), 400
-    
     index = count_messages() + 1
     append_message(index, "User", message)
     
     return jsonify({'ok': True, 'index': index})
+
+
+@app.route('/restart', methods=['POST'])
+def restart():
+    """Clear the channel to restart the conversation."""
+    if os.path.exists(CHANNEL_PATH):
+        os.remove(CHANNEL_PATH)
+    return jsonify({'ok': True})
 
 
 @app.route('/stop', methods=['POST'])

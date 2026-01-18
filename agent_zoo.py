@@ -7,6 +7,7 @@ Usage:
     uv run agent_zoo.py --params my.toml   # Uses custom params file
 
 The conversation runs until stopped. Users can add/edit agents via the web UI.
+Conversation starts when user sends the first message from the UI.
 """
 
 import argparse
@@ -21,6 +22,7 @@ SEPARATOR = "=" * 80
 SUBSEPARATOR = "-" * 80
 STOP_FILE = ".stop"
 SETTINGS_FILE = ".settings.json"
+CHANNEL_PATH = "channel.txt"
 
 DEFAULT_SETTINGS = {
     "max_tokens": 512,
@@ -146,9 +148,7 @@ def main():
 
     # Load params from file
     params = load_params(args.params)
-
-    message = params["message"]
-    channel_path = params.get("channel", "channel.txt")
+    channel_path = params.get("channel", CHANNEL_PATH)
 
     # Build initial agents list from params
     initial_agents = []
@@ -167,27 +167,39 @@ def main():
     # Initialize OpenAI client
     client = OpenAI()
 
-    # Clear stop file and channel, initialize settings with agents
+    # Clear stop file, initialize settings
     clear_stop()
     
-    initial_settings = {
-        **DEFAULT_SETTINGS,
-        "agents": initial_agents
-    }
-    save_settings(initial_settings)
+    # Load existing settings (preserve UI-added agents) or use params.toml agents
+    existing_settings = load_settings()
+    if not existing_settings.get("agents"):
+        # No agents in settings, use params.toml agents
+        existing_settings["agents"] = initial_agents
+        save_settings(existing_settings)
     
+    # Clear channel file
     if os.path.exists(channel_path):
         os.remove(channel_path)
 
-    message_index = 1
-    append_message(channel_path, message_index, "User", message)
-    print(f"[{message_index}] User: {message[:60]}...")
+    print("Waiting for first message from UI...")
+    print("Open http://localhost:5000 and send a message to start.\n")
+
+    # Wait for first message
+    while not should_stop():
+        if count_messages(channel_path) > 0:
+            break
+        time.sleep(0.3)
+
+    if should_stop():
+        clear_stop()
+        print("Stopped before conversation started.")
+        return
+
+    print("Conversation started!\n")
 
     # Main loop: runs until stopped
     current_turn = 0
-    last_message_count = 1
-
-    print("\nConversation running. Stop via web UI or Ctrl+C.\n")
+    last_message_count = count_messages(channel_path)
 
     while not should_stop():
         # Load current settings (agents may have changed)
@@ -199,9 +211,23 @@ def main():
             time.sleep(0.5)
             continue
         
-        # Check if there's a new message (e.g., user injected one)
+        # Check current message count (may have been reset by restart)
         current_count = count_messages(channel_path)
         
+        # Handle restart (channel was cleared)
+        if current_count == 0:
+            print("\nConversation restarted. Waiting for first message...")
+            last_message_count = 0
+            current_turn = 0
+            while not should_stop() and count_messages(channel_path) == 0:
+                time.sleep(0.3)
+            if should_stop():
+                break
+            print("Conversation started!\n")
+            current_count = count_messages(channel_path)
+            last_message_count = current_count
+        
+        # Check if there's a new message
         if current_count > last_message_count:
             last_author = get_last_author(channel_path)
             last_message_count = current_count
@@ -230,6 +256,10 @@ def main():
         # Check stop again before writing
         if should_stop():
             break
+        
+        # Check if channel was cleared during generation
+        if count_messages(channel_path) == 0:
+            continue
 
         # Append to channel
         message_index = count_messages(channel_path) + 1
@@ -252,6 +282,9 @@ def main():
             if settings.get("paused", False):
                 break
             if count_messages(channel_path) > last_message_count:
+                break
+            # Check for restart
+            if count_messages(channel_path) == 0:
                 break
             time.sleep(0.3)
 
