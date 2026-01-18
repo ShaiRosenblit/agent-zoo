@@ -25,8 +25,9 @@ SUBSEPARATOR = "-" * 80
 
 DEFAULT_SETTINGS = {
     "max_tokens": 512,
-    "delay_seconds": 30,
-    "paused": False
+    "delay_seconds": 5,
+    "paused": False,
+    "agents": []
 }
 
 HTML = """
@@ -106,14 +107,11 @@ HTML = """
             left: 0;
             width: 4px;
             height: 100%;
+            background: #888;
         }
         
         .message.user::before { background: #00d9ff; }
-        .message.einstein::before { background: #ffd700; }
-        .message.feynman::before { background: #ff6b6b; }
-        .message.planner::before { background: #00ff88; }
-        .message.critic::before { background: #ff9f43; }
-        .message.unknown::before { background: #888; }
+        .message.user .message-author { color: #00d9ff; }
         
         .message-header {
             display: flex;
@@ -134,13 +132,8 @@ HTML = """
         .message-author {
             font-weight: 600;
             font-size: 1.1rem;
+            color: #aaa;
         }
-        
-        .message.user .message-author { color: #00d9ff; }
-        .message.einstein .message-author { color: #ffd700; }
-        .message.feynman .message-author { color: #ff6b6b; }
-        .message.planner .message-author { color: #00ff88; }
-        .message.critic .message-author { color: #ff9f43; }
         
         .message-content {
             font-size: 1rem;
@@ -167,15 +160,8 @@ HTML = """
             animation: pulse 2s infinite;
         }
         
-        .status-dot.paused {
-            background: #ffd700;
-            animation: none;
-        }
-        
-        .status-dot.stopped {
-            background: #ff6b6b;
-            animation: none;
-        }
+        .status-dot.paused { background: #ffd700; animation: none; }
+        .status-dot.stopped { background: #ff6b6b; animation: none; }
         
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -194,6 +180,206 @@ HTML = """
             text-align: center;
             border: 1px dashed rgba(255,255,255,0.1);
             border-radius: 12px;
+        }
+        
+        /* Agents Panel */
+        .agents-toggle {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #888;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            z-index: 100;
+        }
+        
+        .agents-toggle:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+        
+        .agents-panel {
+            position: fixed;
+            top: 0;
+            left: -360px;
+            width: 350px;
+            height: 100vh;
+            background: #12121f;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 1rem;
+            overflow-y: auto;
+            transition: left 0.3s ease;
+            z-index: 99;
+        }
+        
+        .agents-panel.open { left: 0; }
+        
+        .agents-panel h2 {
+            font-size: 1rem;
+            color: #888;
+            margin-bottom: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .agent-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .agent-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .agent-name-input {
+            background: transparent;
+            border: none;
+            color: #e0e0e0;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            width: 200px;
+            outline: none;
+            border-bottom: 1px solid transparent;
+        }
+        
+        .agent-name-input:focus { border-bottom-color: #00d9ff; }
+        
+        .agent-prompt-input {
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            color: #ccc;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            padding: 0.5rem;
+            resize: vertical;
+            min-height: 60px;
+            outline: none;
+        }
+        
+        .agent-prompt-input:focus { border-color: #00d9ff; }
+        
+        .agent-delete {
+            background: none;
+            border: none;
+            color: #ff6b6b;
+            cursor: pointer;
+            padding: 0.25rem;
+            opacity: 0.5;
+            font-size: 1rem;
+        }
+        
+        .agent-delete:hover { opacity: 1; }
+        
+        .add-agent-btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(0, 217, 255, 0.1);
+            border: 1px dashed rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            color: #00d9ff;
+            font-family: 'Space Grotesk', sans-serif;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+        
+        .add-agent-btn:hover { background: rgba(0, 217, 255, 0.2); }
+        
+        .new-agent-form {
+            background: rgba(0, 217, 255, 0.05);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+        
+        .new-agent-form.visible { display: block; }
+        
+        .new-agent-form input,
+        .new-agent-form textarea {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+        
+        .new-agent-form input {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.9rem;
+            padding: 0.5rem;
+            outline: none;
+        }
+        
+        .new-agent-form input:focus { border-color: #00d9ff; }
+        
+        .new-agent-form textarea {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            color: #ccc;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            padding: 0.5rem;
+            resize: vertical;
+            min-height: 80px;
+            outline: none;
+        }
+        
+        .new-agent-form textarea:focus { border-color: #00d9ff; }
+        
+        .prompt-row {
+            position: relative;
+        }
+        
+        .enrich-btn {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.65rem;
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .enrich-btn:hover { background: rgba(255, 215, 0, 0.3); }
+        .enrich-btn:disabled { opacity: 0.5; cursor: wait; }
+        
+        .new-agent-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .new-agent-actions button {
+            flex: 1;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .confirm-btn {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            color: #0f0f1a;
+        }
+        
+        .cancel-btn {
+            background: rgba(255,255,255,0.1);
+            color: #888;
         }
         
         /* Control panel */
@@ -244,9 +430,7 @@ HTML = """
             outline: none;
         }
         
-        .control-group input[type="number"]:focus {
-            border-color: #00d9ff;
-        }
+        .control-group input[type="number"]:focus { border-color: #00d9ff; }
         
         .input-row {
             display: flex;
@@ -263,16 +447,10 @@ HTML = """
             font-size: 1rem;
             color: #e0e0e0;
             outline: none;
-            transition: border-color 0.2s;
         }
         
-        #user-input:focus {
-            border-color: #00d9ff;
-        }
-        
-        #user-input::placeholder {
-            color: #555;
-        }
+        #user-input:focus { border-color: #00d9ff; }
+        #user-input::placeholder { color: #555; }
         
         button {
             padding: 0.75rem 1.25rem;
@@ -290,17 +468,8 @@ HTML = """
             color: #0f0f1a;
         }
         
-        #send-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
-        }
-        
-        #send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
+        #send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3); }
+        #send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
         
         #pause-btn {
             background: rgba(255, 215, 0, 0.2);
@@ -308,14 +477,8 @@ HTML = """
             border: 1px solid #ffd700;
         }
         
-        #pause-btn:hover {
-            background: rgba(255, 215, 0, 0.3);
-        }
-        
-        #pause-btn.paused {
-            background: #ffd700;
-            color: #0f0f1a;
-        }
+        #pause-btn:hover { background: rgba(255, 215, 0, 0.3); }
+        #pause-btn.paused { background: #ffd700; color: #0f0f1a; }
         
         #stop-btn {
             background: rgba(255, 107, 107, 0.2);
@@ -323,12 +486,29 @@ HTML = """
             border: 1px solid #ff6b6b;
         }
         
-        #stop-btn:hover {
-            background: rgba(255, 107, 107, 0.3);
-        }
+        #stop-btn:hover { background: rgba(255, 107, 107, 0.3); }
     </style>
 </head>
 <body>
+    <button class="agents-toggle" id="agents-toggle">Agents</button>
+    
+    <div class="agents-panel" id="agents-panel">
+        <h2>Agents</h2>
+        <div id="agents-list"></div>
+        <button class="add-agent-btn" id="add-agent-btn">+ Add Agent</button>
+        <div class="new-agent-form" id="new-agent-form">
+            <input type="text" id="new-agent-name" placeholder="Agent name..." />
+            <div class="prompt-row">
+                <textarea id="new-agent-prompt" placeholder="System prompt (brief is fine, click Enrich to expand)..."></textarea>
+                <button class="enrich-btn" id="enrich-new-prompt">Enrich</button>
+            </div>
+            <div class="new-agent-actions">
+                <button class="cancel-btn" id="cancel-new-agent">Cancel</button>
+                <button class="confirm-btn" id="confirm-new-agent">Add</button>
+            </div>
+        </div>
+    </div>
+    
     <div class="container">
         <h1>Agent Zoo</h1>
         <p class="subtitle">watching channel.txt</p>
@@ -351,7 +531,7 @@ HTML = """
                 </div>
                 <div class="control-group">
                     <label>Delay (sec)</label>
-                    <input type="number" id="delay-seconds" value="30" min="0" max="300" step="5">
+                    <input type="number" id="delay-seconds" value="5" min="0" max="300" step="5">
                 </div>
                 <button id="pause-btn">Pause</button>
                 <button id="stop-btn">Stop</button>
@@ -374,19 +554,143 @@ HTML = """
         const stopBtn = document.getElementById('stop-btn');
         const maxTokensInput = document.getElementById('max-tokens');
         const delayInput = document.getElementById('delay-seconds');
+        const agentsToggle = document.getElementById('agents-toggle');
+        const agentsPanel = document.getElementById('agents-panel');
+        const agentsList = document.getElementById('agents-list');
+        const addAgentBtn = document.getElementById('add-agent-btn');
+        const newAgentForm = document.getElementById('new-agent-form');
+        const newAgentName = document.getElementById('new-agent-name');
+        const newAgentPrompt = document.getElementById('new-agent-prompt');
+        const cancelNewAgent = document.getElementById('cancel-new-agent');
+        const confirmNewAgent = document.getElementById('confirm-new-agent');
+        const enrichNewPrompt = document.getElementById('enrich-new-prompt');
         
         let messageCount = 0;
         let isPaused = false;
         let totalTokens = 0;
+        let agents = [];
+        
+        // Agents panel toggle
+        agentsToggle.onclick = () => agentsPanel.classList.toggle('open');
+        
+        function renderAgents() {
+            agentsList.innerHTML = '';
+            agents.forEach((agent, idx) => {
+                const card = document.createElement('div');
+                card.className = 'agent-card';
+                card.innerHTML = `
+                    <div class="agent-card-header">
+                        <input type="text" class="agent-name-input" value="${escapeHtml(agent.name)}" data-idx="${idx}" data-field="name" />
+                        <button class="agent-delete" data-idx="${idx}">&times;</button>
+                    </div>
+                    <textarea class="agent-prompt-input" data-idx="${idx}" data-field="prompt" rows="3">${escapeHtml(agent.prompt)}</textarea>
+                `;
+                agentsList.appendChild(card);
+            });
+            
+            // Bind events
+            document.querySelectorAll('.agent-name-input, .agent-prompt-input').forEach(input => {
+                input.oninput = onAgentChange;
+            });
+            document.querySelectorAll('.agent-delete').forEach(btn => {
+                btn.onclick = () => deleteAgent(parseInt(btn.dataset.idx));
+            });
+        }
+        
+        function onAgentChange(e) {
+            const idx = parseInt(e.target.dataset.idx);
+            const field = e.target.dataset.field;
+            agents[idx][field] = e.target.value;
+            saveAgentsDebounced();
+        }
+        
+        let saveAgentsTimeout;
+        function saveAgentsDebounced() {
+            clearTimeout(saveAgentsTimeout);
+            saveAgentsTimeout = setTimeout(saveAgents, 500);
+        }
+        
+        async function saveAgents() {
+            try {
+                await fetch('/agents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agents })
+                });
+            } catch (e) {
+                console.error('Failed to save agents:', e);
+            }
+        }
+        
+        function deleteAgent(idx) {
+            agents.splice(idx, 1);
+            renderAgents();
+            saveAgents();
+        }
+        
+        addAgentBtn.onclick = () => {
+            newAgentName.value = '';
+            newAgentPrompt.value = '';
+            newAgentForm.classList.add('visible');
+            addAgentBtn.style.display = 'none';
+            newAgentName.focus();
+        };
+        
+        cancelNewAgent.onclick = () => {
+            newAgentForm.classList.remove('visible');
+            addAgentBtn.style.display = 'block';
+        };
+        
+        confirmNewAgent.onclick = () => {
+            const name = newAgentName.value.trim();
+            const prompt = newAgentPrompt.value.trim();
+            
+            if (!name) {
+                newAgentName.focus();
+                return;
+            }
+            
+            agents.push({ name, prompt: prompt || 'You are a helpful assistant.' });
+            renderAgents();
+            saveAgents();
+            
+            newAgentForm.classList.remove('visible');
+            addAgentBtn.style.display = 'block';
+        };
+        
+        enrichNewPrompt.onclick = async () => {
+            const name = newAgentName.value.trim() || 'Agent';
+            const prompt = newAgentPrompt.value.trim();
+            
+            if (!prompt) {
+                newAgentPrompt.focus();
+                return;
+            }
+            
+            enrichNewPrompt.disabled = true;
+            enrichNewPrompt.textContent = '...';
+            
+            try {
+                const res = await fetch('/enrich', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, prompt })
+                });
+                const data = await res.json();
+                if (data.enriched) {
+                    newAgentPrompt.value = data.enriched;
+                }
+            } catch (e) {
+                console.error('Failed to enrich:', e);
+            }
+            
+            enrichNewPrompt.disabled = false;
+            enrichNewPrompt.textContent = 'Enrich';
+        };
         
         function getAgentClass(author) {
-            const lower = author.toLowerCase();
-            if (lower === 'user') return 'user';
-            if (lower === 'einstein') return 'einstein';
-            if (lower === 'feynman') return 'feynman';
-            if (lower === 'planner') return 'planner';
-            if (lower === 'critic') return 'critic';
-            return 'unknown';
+            if (author.toLowerCase() === 'user') return 'user';
+            return '';
         }
         
         function renderMessage(msg) {
@@ -395,7 +699,7 @@ HTML = """
             div.innerHTML = `
                 <div class="message-header">
                     <span class="message-index">#${msg.index}</span>
-                    <span class="message-author">${msg.author}</span>
+                    <span class="message-author">${escapeHtml(msg.author)}</span>
                 </div>
                 <div class="message-content">${escapeHtml(msg.content)}</div>
             `;
@@ -418,42 +722,39 @@ HTML = """
             }
         }
         
-        // Update settings
         async function updateSettings() {
-            const settings = {
-                max_tokens: parseInt(maxTokensInput.value) || 512,
-                delay_seconds: parseInt(delayInput.value) || 30,
-                paused: isPaused
-            };
-            
             try {
                 await fetch('/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(settings)
+                    body: JSON.stringify({
+                        max_tokens: parseInt(maxTokensInput.value) || 512,
+                        delay_seconds: parseInt(delayInput.value) || 5,
+                        paused: isPaused
+                    })
                 });
             } catch (e) {
                 console.error('Failed to update settings:', e);
             }
         }
         
-        // Load initial settings
         async function loadSettings() {
             try {
                 const res = await fetch('/settings');
                 const settings = await res.json();
                 maxTokensInput.value = settings.max_tokens || 512;
-                delayInput.value = settings.delay_seconds || 30;
+                delayInput.value = settings.delay_seconds || 5;
                 isPaused = settings.paused || false;
                 pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
                 pauseBtn.classList.toggle('paused', isPaused);
+                agents = settings.agents || [];
+                renderAgents();
                 updateStatus();
             } catch (e) {
                 console.error('Failed to load settings:', e);
             }
         }
         
-        // Debounce for input changes
         let settingsTimeout;
         function onSettingsChange() {
             clearTimeout(settingsTimeout);
@@ -463,7 +764,6 @@ HTML = """
         maxTokensInput.oninput = onSettingsChange;
         delayInput.oninput = onSettingsChange;
         
-        // Send message
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
@@ -477,10 +777,7 @@ HTML = """
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
-                
-                if (res.ok) {
-                    userInput.value = '';
-                }
+                if (res.ok) userInput.value = '';
             } catch (e) {
                 console.error('Failed to send:', e);
             }
@@ -491,11 +788,8 @@ HTML = """
         }
         
         sendBtn.onclick = sendMessage;
-        userInput.onkeydown = (e) => {
-            if (e.key === 'Enter') sendMessage();
-        };
+        userInput.onkeydown = (e) => { if (e.key === 'Enter') sendMessage(); };
         
-        // Pause/Resume
         pauseBtn.onclick = async () => {
             isPaused = !isPaused;
             pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
@@ -504,7 +798,6 @@ HTML = """
             await updateSettings();
         };
         
-        // Stop conversation
         stopBtn.onclick = async () => {
             try {
                 await fetch('/stop', { method: 'POST' });
@@ -515,7 +808,6 @@ HTML = """
             }
         };
         
-        // SSE stream
         const source = new EventSource('/stream');
         
         source.onopen = () => {
@@ -535,11 +827,8 @@ HTML = """
                 return;
             }
             
-            // Only render new messages
             if (data.messages.length > messageCount) {
-                if (messageCount === 0) {
-                    channel.innerHTML = '';
-                }
+                if (messageCount === 0) channel.innerHTML = '';
                 
                 for (let i = messageCount; i < data.messages.length; i++) {
                     channel.appendChild(renderMessage(data.messages[i]));
@@ -549,8 +838,6 @@ HTML = """
                 totalTokens = data.total_tokens || 0;
                 tokenCountEl.textContent = totalTokens > 0 ? `~${totalTokens.toLocaleString()} tokens` : '';
                 updateStatus();
-                
-                // Scroll to bottom
                 window.scrollTo(0, document.body.scrollHeight);
             }
         };
@@ -578,7 +865,7 @@ def load_settings() -> dict:
 def save_settings(settings: dict) -> None:
     """Save settings to file."""
     with open(SETTINGS_FILE, "w") as f:
-        json.dump(settings, f)
+        json.dump(settings, f, indent=2)
 
 
 def estimate_tokens(text: str) -> int:
@@ -592,7 +879,6 @@ def parse_channel(content: str) -> list[dict]:
         return []
     
     messages = []
-    # Split by the separator line
     blocks = re.split(r'={80}\n', content)
     
     for block in blocks:
@@ -600,14 +886,12 @@ def parse_channel(content: str) -> list[dict]:
         if not block:
             continue
         
-        # Parse header: [index] Author
         lines = block.split('\n')
         header_match = re.match(r'\[(\d+)\]\s+(.+)', lines[0])
         if header_match:
             index = int(header_match.group(1))
             author = header_match.group(2).strip()
             
-            # Content is everything after the separator line
             content_start = 1
             if len(lines) > 1 and lines[1].startswith('-' * 10):
                 content_start = 2
@@ -677,7 +961,6 @@ def index():
 @app.route('/stream')
 def stream():
     def generate():
-        # Send initial state
         if os.path.exists(CHANNEL_PATH):
             with open(CHANNEL_PATH, 'r') as f:
                 content = f.read()
@@ -688,7 +971,6 @@ def stream():
         total_tokens = estimate_tokens(content)
         yield f"data: {json.dumps({'messages': messages, 'total_tokens': total_tokens})}\n\n"
         
-        # Watch for changes
         for content in watch_channel():
             messages = parse_channel(content)
             total_tokens = estimate_tokens(content)
@@ -720,6 +1002,19 @@ def update_settings():
     return jsonify({'ok': True})
 
 
+@app.route('/agents', methods=['POST'])
+def update_agents():
+    """Update agents list."""
+    data = request.get_json()
+    settings = load_settings()
+    
+    if 'agents' in data:
+        settings['agents'] = data['agents']
+    
+    save_settings(settings)
+    return jsonify({'ok': True})
+
+
 @app.route('/send', methods=['POST'])
 def send():
     """Add a user message to the channel."""
@@ -744,6 +1039,53 @@ def stop():
     with open(STOP_FILE, 'w') as f:
         f.write('stop')
     return jsonify({'ok': True})
+
+
+@app.route('/enrich', methods=['POST'])
+def enrich():
+    """Enrich a system prompt using AI."""
+    import openai
+    
+    data = request.get_json()
+    name = data.get('name', 'Agent')
+    prompt = data.get('prompt', '').strip()
+    
+    if not prompt:
+        return jsonify({'error': 'No prompt provided'}), 400
+    
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'OPENAI_API_KEY not set'}), 500
+    
+    try:
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """You are an expert at writing system prompts for AI agents.
+Given a brief description, expand it into a detailed, effective system prompt.
+Keep it focused and actionable. Include:
+- Clear role definition
+- Personality/tone guidance  
+- Key behaviors and rules
+- What to emphasize or avoid
+
+Return ONLY the improved prompt text, no explanations."""
+                },
+                {
+                    "role": "user",
+                    "content": f"Agent name: {name}\n\nBrief description:\n{prompt}\n\nWrite an enriched system prompt:"
+                }
+            ],
+            max_tokens=500,
+        )
+        enriched = response.choices[0].message.content.strip()
+        return jsonify({'enriched': enriched})
+    except Exception as e:
+        print(f"Enrich error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

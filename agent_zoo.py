@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Multi-Agent Channel: Two AI agents collaborate via a shared append-only text file.
+Multi-Agent Channel: Multiple AI agents collaborate via a shared append-only text file.
 
 Usage:
     uv run agent_zoo.py                    # Uses params.toml
     uv run agent_zoo.py --params my.toml   # Uses custom params file
 
-The conversation runs until stopped. Users can inject messages via the web UI.
+The conversation runs until stopped. Users can add/edit agents via the web UI.
 """
 
 import argparse
 import json
 import os
+import re
 import time
 import tomllib
 from openai import OpenAI
@@ -23,8 +24,9 @@ SETTINGS_FILE = ".settings.json"
 
 DEFAULT_SETTINGS = {
     "max_tokens": 512,
-    "delay_seconds": 30,
-    "paused": False
+    "delay_seconds": 5,
+    "paused": False,
+    "agents": []
 }
 
 
@@ -44,7 +46,7 @@ def load_settings() -> dict:
 def save_settings(settings: dict) -> None:
     """Save settings to file."""
     with open(SETTINGS_FILE, "w") as f:
-        json.dump(settings, f)
+        json.dump(settings, f, indent=2)
 
 
 # --- Channel Operations ---
@@ -80,8 +82,6 @@ def get_last_author(path: str) -> str | None:
     if not content.strip():
         return None
     
-    # Find the last header line [index] Author
-    import re
     matches = list(re.finditer(r'\[(\d+)\]\s+(.+)', content))
     if matches:
         return matches[-1].group(2).strip()
@@ -90,33 +90,27 @@ def get_last_author(path: str) -> str | None:
 
 # --- Agent ---
 
-class Agent:
-    def __init__(self, name: str, system_prompt: str, client: OpenAI):
-        self.name = name
-        self.system_prompt = system_prompt
-        self.client = client
+def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, client: OpenAI) -> str:
+    """Generate a response for an agent."""
+    messages = [
+        {"role": "system", "content": prompt},
+        {
+            "role": "user",
+            "content": (
+                "Here is the conversation so far:\n\n"
+                f"{channel_content}\n\n"
+                "Write your next message."
+            ),
+        },
+    ]
 
-    def respond(self, channel_content: str, max_tokens: int) -> str:
-        """Generate a response based on the current channel content."""
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {
-                "role": "user",
-                "content": (
-                    "Here is the conversation so far:\n\n"
-                    f"{channel_content}\n\n"
-                    "Write your next message."
-                ),
-            },
-        ]
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        max_tokens=max_tokens,
+    )
 
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            max_tokens=max_tokens,
-        )
-
-        return response.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip()
 
 
 # --- Main ---
@@ -154,30 +148,33 @@ def main():
     params = load_params(args.params)
 
     message = params["message"]
-    first = params.get("first", "agent1")
     channel_path = params.get("channel", "channel.txt")
 
-    agent1_name = params["agent1"]["name"]
-    agent1_prompt = params["agent1"]["prompt"]
-    agent2_name = params["agent2"]["name"]
-    agent2_prompt = params["agent2"]["prompt"]
+    # Build initial agents list from params
+    initial_agents = []
+    i = 1
+    while True:
+        key = f"agent{i}"
+        if key in params:
+            initial_agents.append({
+                "name": params[key]["name"],
+                "prompt": params[key]["prompt"]
+            })
+            i += 1
+        else:
+            break
 
     # Initialize OpenAI client
     client = OpenAI()
 
-    # Create agents
-    agent1 = Agent(agent1_name, agent1_prompt, client)
-    agent2 = Agent(agent2_name, agent2_prompt, client)
-
-    # Build agent lookup and turn order
-    if first == "agent1":
-        turn_order = [agent1, agent2]
-    else:
-        turn_order = [agent2, agent1]
-
-    # Clear stop file and channel, initialize settings
+    # Clear stop file and channel, initialize settings with agents
     clear_stop()
-    save_settings(DEFAULT_SETTINGS)
+    
+    initial_settings = {
+        **DEFAULT_SETTINGS,
+        "agents": initial_agents
+    }
+    save_settings(initial_settings)
     
     if os.path.exists(channel_path):
         os.remove(channel_path)
@@ -193,11 +190,12 @@ def main():
     print("\nConversation running. Stop via web UI or Ctrl+C.\n")
 
     while not should_stop():
-        # Load current settings
+        # Load current settings (agents may have changed)
         settings = load_settings()
+        agents = settings.get("agents", [])
         
-        # Check if paused
-        if settings.get("paused", False):
+        # Check if paused or no agents
+        if settings.get("paused", False) or not agents:
             time.sleep(0.5)
             continue
         
@@ -205,28 +203,29 @@ def main():
         current_count = count_messages(channel_path)
         
         if current_count > last_message_count:
-            # Someone else posted - figure out who should respond
             last_author = get_last_author(channel_path)
             last_message_count = current_count
             
-            # If User posted, the first agent in turn order responds
+            # If User posted, reset to first agent
             if last_author == "User":
                 current_turn = 0
-            # If an agent posted, the other agent responds
-            elif last_author == agent1.name:
-                current_turn = 1 if turn_order[1].name == agent2.name else 0
-            elif last_author == agent2.name:
-                current_turn = 0 if turn_order[0].name == agent1.name else 1
+            else:
+                # Find which agent posted and move to next
+                for idx, agent in enumerate(agents):
+                    if agent["name"] == last_author:
+                        current_turn = (idx + 1) % len(agents)
+                        break
         
-        # Get current agent
-        agent = turn_order[current_turn % 2]
+        # Get current agent (handle case where agents list changed)
+        current_turn = current_turn % len(agents)
+        agent = agents[current_turn]
         
         # Read current channel state
         channel_content = read_channel(channel_path)
 
-        # Generate response with current max_tokens setting
+        # Generate response
         max_tokens = settings.get("max_tokens", 512)
-        response = agent.respond(channel_content, max_tokens)
+        response = call_agent(agent["name"], agent["prompt"], channel_content, max_tokens, client)
 
         # Check stop again before writing
         if should_stop():
@@ -234,26 +233,24 @@ def main():
 
         # Append to channel
         message_index = count_messages(channel_path) + 1
-        append_message(channel_path, message_index, agent.name, response)
+        append_message(channel_path, message_index, agent["name"], response)
 
         # Progress indicator
         preview = response[:60].replace("\n", " ")
-        print(f"[{message_index}] {agent.name}: {preview}...")
+        print(f"[{message_index}] {agent['name']}: {preview}...")
 
         last_message_count = message_index
-        current_turn = (current_turn + 1) % 2
+        current_turn = (current_turn + 1) % len(agents)
 
-        # Wait based on delay setting (check for stop/pause during wait)
-        delay = settings.get("delay_seconds", 30)
+        # Wait based on delay setting
+        delay = settings.get("delay_seconds", 5)
         wait_start = time.time()
         while time.time() - wait_start < delay:
             if should_stop():
                 break
-            # Re-check settings in case user changed them
             settings = load_settings()
             if settings.get("paused", False):
                 break
-            # Check if user posted a new message
             if count_messages(channel_path) > last_message_count:
                 break
             time.sleep(0.3)
