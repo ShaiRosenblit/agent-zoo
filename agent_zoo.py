@@ -24,10 +24,11 @@ SUBSEPARATOR = "-" * 80
 STOP_FILE = ".stop"
 SETTINGS_FILE = ".settings.json"
 CHANNEL_PATH = "channel.txt"
+AGENT_STATE_FILE = ".agent_state.json"
 
 DEFAULT_SETTINGS = {
     "max_tokens": 512,
-    "delay_seconds": 5,
+    "delay_seconds": 0,
     "paused": False,
     "global_prompt": "",
     "agents": [],
@@ -91,6 +92,44 @@ def save_settings(settings: dict) -> None:
         json.dump(settings, f, indent=2)
 
 
+# --- Agent State ---
+
+def load_agent_state() -> dict:
+    """Load agent state from file."""
+    if os.path.exists(AGENT_STATE_FILE):
+        try:
+            with open(AGENT_STATE_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"current_agent": None, "state": "idle", "timestamp": 0, "pass_history": []}
+
+
+def update_agent_state(agent_name: str, state: str) -> None:
+    """Update agent state (thinking, passed, responded, idle)."""
+    current = load_agent_state()
+    current["current_agent"] = agent_name
+    current["state"] = state
+    current["timestamp"] = time.time()
+    
+    # Track passes in history (keep last 10 seconds worth)
+    if state == "passed":
+        current["pass_history"].append({"agent": agent_name, "time": current["timestamp"]})
+    
+    # Clean old pass history (older than 10 seconds)
+    cutoff = time.time() - 10
+    current["pass_history"] = [p for p in current["pass_history"] if p["time"] > cutoff]
+    
+    with open(AGENT_STATE_FILE, "w") as f:
+        json.dump(current, f)
+
+
+def clear_agent_state() -> None:
+    """Clear agent state file."""
+    if os.path.exists(AGENT_STATE_FILE):
+        os.remove(AGENT_STATE_FILE)
+
+
 # --- Channel Operations ---
 
 def read_channel(path: str) -> str:
@@ -135,7 +174,12 @@ def get_last_author(path: str) -> str | None:
 ENVIRONMENT_CONTEXT = """You are participating in a multi-agent conversation channel.
 Multiple AI agents and humans communicate via a shared text channel.
 Messages are numbered and attributed to their author.
-Respond naturally as yourself, acknowledging other participants when relevant."""
+Respond naturally as yourself, acknowledging other participants when relevant.
+
+If you have nothing meaningful to add to the conversation, respond with exactly [PASS] (nothing else). This signals you're present but choosing not to speak. Use this when:
+- The conversation doesn't require your input
+- Another participant already covered what you would say
+- You're waiting for more context before contributing"""
 
 
 def build_participants_context(agents: list[dict], current_agent_name: str) -> str:
@@ -288,8 +332,9 @@ def main():
     # Initialize OpenAI client
     client = OpenAI()
 
-    # Clear stop file, initialize settings
+    # Clear stop file, agent state, initialize settings
     clear_stop()
+    clear_agent_state()
     
     # Load existing settings (preserve UI-added agents) or use params.toml agents
     existing_settings = load_settings()
@@ -342,6 +387,7 @@ def main():
         # Handle restart (channel was cleared)
         if current_count == 0:
             print("\nConversation restarted. Waiting for first message...")
+            clear_agent_state()
             last_message_count = 0
             current_turn = 0
             while not should_stop() and count_messages(channel_path) == 0:
@@ -378,6 +424,9 @@ def main():
         user_instructions = settings.get("global_prompt", "")
         global_context = build_global_context(agents, agent["name"], user_instructions)
 
+        # Update state to "thinking"
+        update_agent_state(agent["name"], "thinking")
+
         # Generate response
         max_tokens = settings.get("max_tokens", 512)
         model = agent.get("model", "gpt-4o")
@@ -386,15 +435,25 @@ def main():
 
         # Check stop again before writing
         if should_stop():
+            update_agent_state(agent["name"], "idle")
             break
         
         # Check if channel was cleared during generation
         if count_messages(channel_path) == 0:
+            update_agent_state(agent["name"], "idle")
+            continue
+
+        # Check if agent passed
+        if response.strip() == "[PASS]":
+            update_agent_state(agent["name"], "passed")
+            print(f"    {agent['name']}: [passed]")
+            current_turn = (current_turn + 1) % len(agents)
             continue
 
         # Append to channel
         message_index = count_messages(channel_path) + 1
         append_message(channel_path, message_index, agent["name"], response)
+        update_agent_state(agent["name"], "responded")
 
         # Progress indicator
         preview = response[:60].replace("\n", " ")
@@ -404,7 +463,7 @@ def main():
         current_turn = (current_turn + 1) % len(agents)
 
         # Wait based on delay setting
-        delay = settings.get("delay_seconds", 5)
+        delay = settings.get("delay_seconds", 0)
         wait_start = time.time()
         while time.time() - wait_start < delay:
             if should_stop():
@@ -420,6 +479,7 @@ def main():
             time.sleep(0.3)
 
     clear_stop()
+    clear_agent_state()
     print(f"\nStopped. Conversation saved to {channel_path}")
 
 

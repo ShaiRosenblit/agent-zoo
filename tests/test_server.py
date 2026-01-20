@@ -1,7 +1,6 @@
 """Tests for server.py Flask API endpoints and utilities."""
 
 import json
-import os
 import pytest
 
 import server
@@ -14,6 +13,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "CHANNEL_PATH", str(tmp_path / "channel.txt"))
     monkeypatch.setattr(server, "STOP_FILE", str(tmp_path / ".stop"))
     monkeypatch.setattr(server, "SETTINGS_FILE", str(tmp_path / ".settings.json"))
+    monkeypatch.setattr(server, "AGENT_STATE_FILE", str(tmp_path / ".agent_state.json"))
     
     server.app.config["TESTING"] = True
     with server.app.test_client() as test_client:
@@ -440,4 +440,77 @@ class TestIndexRoute:
         assert response.status_code == 200
         assert b"Agent Zoo" in response.data
         assert b"<!DOCTYPE html>" in response.data
+
+
+class TestLoadAgentState:
+    """Tests for load_agent_state utility function."""
+
+    def test_load_agent_state_returns_defaults(self, tmp_path, monkeypatch):
+        """load_agent_state returns defaults when file doesn't exist."""
+        monkeypatch.setattr(server, "AGENT_STATE_FILE", str(tmp_path / "nonexistent.json"))
+        
+        state = server.load_agent_state()
+        
+        assert state["current_agent"] is None
+        assert state["state"] == "idle"
+        assert state["timestamp"] == 0
+        assert state["pass_history"] == []
+
+    def test_load_agent_state_reads_file(self, tmp_path, monkeypatch):
+        """load_agent_state reads state from file."""
+        state_file = tmp_path / ".agent_state.json"
+        state_file.write_text(json.dumps({
+            "current_agent": "TestBot",
+            "state": "thinking",
+            "timestamp": 999,
+            "pass_history": [{"agent": "OtherBot", "time": 888}]
+        }))
+        monkeypatch.setattr(server, "AGENT_STATE_FILE", str(state_file))
+        
+        state = server.load_agent_state()
+        
+        assert state["current_agent"] == "TestBot"
+        assert state["state"] == "thinking"
+        assert state["timestamp"] == 999
+        assert len(state["pass_history"]) == 1
+
+    def test_load_agent_state_handles_corrupted_file(self, tmp_path, monkeypatch):
+        """load_agent_state returns defaults for corrupted file."""
+        state_file = tmp_path / ".agent_state.json"
+        state_file.write_text("invalid json {{")
+        monkeypatch.setattr(server, "AGENT_STATE_FILE", str(state_file))
+        
+        state = server.load_agent_state()
+        
+        assert state["current_agent"] is None
+        assert state["state"] == "idle"
+
+
+class TestAgentIndicatorUI:
+    """Tests for agent indicator UI elements."""
+
+    def test_html_contains_indicator_container(self, client):
+        """HTML page contains agent indicator container."""
+        response = client.get("/")
+        
+        assert b'id="agent-indicators"' in response.data
+        assert b'agent-indicator-container' in response.data
+
+    def test_html_contains_indicator_css(self, client):
+        """HTML page contains indicator CSS styles."""
+        response = client.get("/")
+        
+        assert b'.agent-indicator' in response.data
+        assert b'.thinking' in response.data
+        assert b'.passed' in response.data
+        assert b'indicatorPulse' in response.data
+        assert b'indicatorFadeOut' in response.data
+
+    def test_html_contains_indicator_js(self, client):
+        """HTML page contains indicator JavaScript."""
+        response = client.get("/")
+        
+        assert b'renderAgentIndicators' in response.data
+        assert b'clearAgentIndicators' in response.data
+        assert b'agent_state' in response.data
 

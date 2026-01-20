@@ -20,12 +20,13 @@ app = Flask(__name__)
 CHANNEL_PATH = "channel.txt"
 STOP_FILE = ".stop"
 SETTINGS_FILE = ".settings.json"
+AGENT_STATE_FILE = ".agent_state.json"
 SEPARATOR = "=" * 80
 SUBSEPARATOR = "-" * 80
 
 DEFAULT_SETTINGS = {
     "max_tokens": 512,
-    "delay_seconds": 5,
+    "delay_seconds": 0,
     "paused": False,
     "global_prompt": "",
     "agents": []
@@ -700,6 +701,79 @@ HTML = """
         }
         
         #restart-btn:hover { background: var(--primary-50); }
+        
+        /* Agent Activity Indicator */
+        .agent-indicator-container {
+            min-height: 32px;
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .agent-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            animation: indicatorFadeIn 0.2s var(--ease-standard);
+        }
+        
+        .agent-indicator.thinking {
+            background: var(--primary-50);
+            border: 1px solid var(--primary-100);
+            color: var(--primary-600);
+        }
+        
+        .agent-indicator.passed {
+            background: var(--neutral-50);
+            border: 1px solid var(--neutral-100);
+            color: var(--neutral-500);
+            animation: indicatorFadeOut 3s var(--ease-standard) forwards;
+        }
+        
+        .agent-indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .agent-indicator.thinking .agent-indicator-dot {
+            background: var(--info);
+            animation: indicatorPulse 1.5s infinite;
+        }
+        
+        .agent-indicator.passed .agent-indicator-dot {
+            background: var(--neutral-400);
+        }
+        
+        .agent-indicator-icon {
+            font-size: 14px;
+        }
+        
+        @keyframes indicatorFadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes indicatorFadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        @keyframes indicatorPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+            .agent-indicator, .agent-indicator-dot { animation: none; }
+            .agent-indicator.passed { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -766,6 +840,7 @@ HTML = """
         <div id="channel">
             <div class="empty">Send a message to start the conversation...</div>
         </div>
+        <div class="agent-indicator-container" id="agent-indicators"></div>
     </div>
     
     <div class="control-area">
@@ -777,7 +852,7 @@ HTML = """
                 </div>
                 <div class="control-group">
                     <label>Delay (sec)</label>
-                    <input type="number" id="delay-seconds" value="5" min="0" max="300" step="5">
+                    <input type="number" id="delay-seconds" value="0" min="0" max="300" step="5">
                 </div>
                 <button id="pause-btn">Pause</button>
                 <button id="restart-btn">Restart</button>
@@ -836,11 +911,15 @@ HTML = """
             return REASONING_MODELS.some(m => model && model.startsWith(m));
         }
         
+        const agentIndicators = document.getElementById('agent-indicators');
+        
         let messageCount = 0;
         let isPaused = false;
         let totalTokens = 0;
         let agents = [];
         let globalPrompt = '';
+        let lastAgentState = null;
+        let passIndicatorTimeouts = {};
         
         // Agents panel toggle
         agentsToggle.onclick = () => agentsPanel.classList.toggle('open');
@@ -1024,6 +1103,63 @@ HTML = """
             return div.innerHTML;
         }
         
+        function renderAgentIndicators(agentState) {
+            if (!agentState) return;
+            
+            // Clear thinking indicator if state changed to something else
+            const thinkingIndicator = agentIndicators.querySelector('.thinking');
+            if (thinkingIndicator && agentState.state !== 'thinking') {
+                thinkingIndicator.remove();
+            }
+            
+            // Show thinking indicator
+            if (agentState.state === 'thinking' && agentState.current_agent) {
+                if (!agentIndicators.querySelector('.thinking')) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'agent-indicator thinking';
+                    indicator.innerHTML = `
+                        <span class="agent-indicator-dot"></span>
+                        <span>${escapeHtml(agentState.current_agent)} is thinking...</span>
+                    `;
+                    agentIndicators.appendChild(indicator);
+                }
+            }
+            
+            // Show passed indicators from history
+            const now = Date.now() / 1000;
+            const recentPasses = (agentState.pass_history || []).filter(p => now - p.time < 5);
+            
+            // Add new pass indicators
+            recentPasses.forEach(pass => {
+                const passId = `pass-${pass.agent}-${Math.floor(pass.time * 1000)}`;
+                if (!agentIndicators.querySelector(`[data-pass-id="${passId}"]`) && !passIndicatorTimeouts[passId]) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'agent-indicator passed';
+                    indicator.dataset.passId = passId;
+                    indicator.innerHTML = `
+                        <span class="agent-indicator-icon">↪</span>
+                        <span>${escapeHtml(pass.agent)} read and passed</span>
+                    `;
+                    agentIndicators.appendChild(indicator);
+                    
+                    // Remove after animation completes (3 seconds)
+                    passIndicatorTimeouts[passId] = setTimeout(() => {
+                        indicator.remove();
+                        delete passIndicatorTimeouts[passId];
+                    }, 3000);
+                }
+            });
+            
+            lastAgentState = agentState;
+        }
+        
+        function clearAgentIndicators() {
+            agentIndicators.innerHTML = '';
+            // Clear any pending timeouts
+            Object.values(passIndicatorTimeouts).forEach(clearTimeout);
+            passIndicatorTimeouts = {};
+        }
+        
         function updateStatus() {
             if (isPaused) {
                 statusDot.className = 'status-dot paused';
@@ -1041,7 +1177,7 @@ HTML = """
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         max_tokens: parseInt(maxTokensInput.value) || 512,
-                        delay_seconds: parseInt(delayInput.value) || 5,
+                        delay_seconds: parseInt(delayInput.value) || 0,
                         paused: isPaused
                     })
                 });
@@ -1055,7 +1191,7 @@ HTML = """
                 const res = await fetch('/settings');
                 const settings = await res.json();
                 maxTokensInput.value = settings.max_tokens || 512;
-                delayInput.value = settings.delay_seconds || 5;
+                delayInput.value = settings.delay_seconds ?? 0;
                 isPaused = settings.paused || false;
                 pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
                 pauseBtn.classList.toggle('paused', isPaused);
@@ -1137,6 +1273,7 @@ HTML = """
                 await fetch('/restart', { method: 'POST' });
                 messageCount = 0;
                 channel.innerHTML = '<div class="empty">Send a message to start the conversation...</div>';
+                clearAgentIndicators();
                 updateStatus();
             } catch (e) {
                 console.error('Failed to restart:', e);
@@ -1168,6 +1305,7 @@ HTML = """
                 messageCount = 0;
                 totalTokens = 0;
                 tokenCountEl.textContent = '';
+                clearAgentIndicators();
                 updateStatus();
                 return;
             }
@@ -1184,6 +1322,11 @@ HTML = """
                 tokenCountEl.textContent = totalTokens > 0 ? `~${totalTokens.toLocaleString()} tokens` : '';
                 updateStatus();
                 window.scrollTo(0, document.body.scrollHeight);
+            }
+            
+            // Update agent indicators
+            if (data.agent_state) {
+                renderAgentIndicators(data.agent_state);
             }
         };
         
@@ -1216,6 +1359,17 @@ def save_settings(settings: dict) -> None:
 def estimate_tokens(text: str) -> int:
     """Estimate token count (roughly 4 chars per token for English)."""
     return len(text) // 4
+
+
+def load_agent_state() -> dict:
+    """Load agent state from file."""
+    if os.path.exists(AGENT_STATE_FILE):
+        try:
+            with open(AGENT_STATE_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"current_agent": None, "state": "idle", "timestamp": 0, "pass_history": []}
 
 
 def parse_channel(content: str) -> list[dict]:
@@ -1272,26 +1426,44 @@ def append_message(index: int, author: str, content: str) -> None:
         f.write(f"{content}\n\n")
 
 
-def watch_channel():
-    """Generator that yields channel content when it changes."""
+def watch_channel_and_state():
+    """Generator that yields channel content and agent state when either changes."""
     last_content = None
-    last_mtime = 0
+    last_channel_mtime = 0
+    last_state_mtime = 0
     
     while True:
         try:
+            changed = False
+            content = ""
+            
+            # Check channel file
             if os.path.exists(CHANNEL_PATH):
                 mtime = os.path.getmtime(CHANNEL_PATH)
-                if mtime != last_mtime:
+                if mtime != last_channel_mtime:
                     with open(CHANNEL_PATH, 'r') as f:
                         content = f.read()
                     if content != last_content:
                         last_content = content
-                        last_mtime = mtime
-                        yield content
+                        last_channel_mtime = mtime
+                        changed = True
+                else:
+                    content = last_content or ""
             else:
                 if last_content is not None:
                     last_content = None
-                    yield ""
+                    changed = True
+                content = ""
+            
+            # Check agent state file
+            if os.path.exists(AGENT_STATE_FILE):
+                state_mtime = os.path.getmtime(AGENT_STATE_FILE)
+                if state_mtime != last_state_mtime:
+                    last_state_mtime = state_mtime
+                    changed = True
+            
+            if changed:
+                yield content
         except Exception:
             pass
         
@@ -1314,12 +1486,14 @@ def stream():
         
         messages = parse_channel(content)
         total_tokens = estimate_tokens(content)
-        yield f"data: {json.dumps({'messages': messages, 'total_tokens': total_tokens})}\n\n"
+        agent_state = load_agent_state()
+        yield f"data: {json.dumps({'messages': messages, 'total_tokens': total_tokens, 'agent_state': agent_state})}\n\n"
         
-        for content in watch_channel():
+        for content in watch_channel_and_state():
             messages = parse_channel(content)
             total_tokens = estimate_tokens(content)
-            yield f"data: {json.dumps({'messages': messages, 'total_tokens': total_tokens})}\n\n"
+            agent_state = load_agent_state()
+            yield f"data: {json.dumps({'messages': messages, 'total_tokens': total_tokens, 'agent_state': agent_state})}\n\n"
     
     return Response(generate(), mimetype='text/event-stream')
 

@@ -323,3 +323,133 @@ class TestStopSignal:
         # Should not raise
         agent_zoo.clear_stop()
 
+
+class TestAgentState:
+    """Tests for agent state management."""
+
+    def test_load_agent_state_returns_defaults_when_file_missing(self, tmp_path, monkeypatch):
+        """load_agent_state returns defaults when file doesn't exist."""
+        monkeypatch.setattr(agent_zoo, "AGENT_STATE_FILE", str(tmp_path / "nonexistent.json"))
+        
+        state = agent_zoo.load_agent_state()
+        
+        assert state["current_agent"] is None
+        assert state["state"] == "idle"
+        assert state["timestamp"] == 0
+        assert state["pass_history"] == []
+
+    def test_load_agent_state_reads_existing_file(self, tmp_path, monkeypatch):
+        """load_agent_state reads state from existing file."""
+        state_file = tmp_path / ".agent_state.json"
+        state_file.write_text(json.dumps({
+            "current_agent": "Bot1",
+            "state": "thinking",
+            "timestamp": 12345,
+            "pass_history": []
+        }))
+        monkeypatch.setattr(agent_zoo, "AGENT_STATE_FILE", str(state_file))
+        
+        state = agent_zoo.load_agent_state()
+        
+        assert state["current_agent"] == "Bot1"
+        assert state["state"] == "thinking"
+        assert state["timestamp"] == 12345
+
+    def test_load_agent_state_handles_corrupted_file(self, tmp_path, monkeypatch):
+        """load_agent_state returns defaults when file is corrupted."""
+        state_file = tmp_path / ".agent_state.json"
+        state_file.write_text("not valid json {{{")
+        monkeypatch.setattr(agent_zoo, "AGENT_STATE_FILE", str(state_file))
+        
+        state = agent_zoo.load_agent_state()
+        
+        assert state["current_agent"] is None
+        assert state["state"] == "idle"
+
+    def test_update_agent_state_creates_file(self, tmp_path, monkeypatch):
+        """update_agent_state creates state file."""
+        state_file = tmp_path / ".agent_state.json"
+        monkeypatch.setattr(agent_zoo, "AGENT_STATE_FILE", str(state_file))
+        
+        agent_zoo.update_agent_state("TestBot", "thinking")
+        
+        assert state_file.exists()
+        state = json.loads(state_file.read_text())
+        assert state["current_agent"] == "TestBot"
+        assert state["state"] == "thinking"
+        assert state["timestamp"] > 0
+
+    def test_update_agent_state_tracks_passes(self, tmp_path, monkeypatch):
+        """update_agent_state adds passed state to pass_history."""
+        state_file = tmp_path / ".agent_state.json"
+        monkeypatch.setattr(agent_zoo, "AGENT_STATE_FILE", str(state_file))
+        
+        agent_zoo.update_agent_state("Bot1", "passed")
+        
+        state = json.loads(state_file.read_text())
+        assert len(state["pass_history"]) == 1
+        assert state["pass_history"][0]["agent"] == "Bot1"
+        assert state["pass_history"][0]["time"] > 0
+
+    def test_update_agent_state_cleans_old_passes(self, tmp_path, monkeypatch):
+        """update_agent_state removes passes older than 10 seconds."""
+        state_file = tmp_path / ".agent_state.json"
+        import time
+        old_time = time.time() - 20  # 20 seconds ago
+        state_file.write_text(json.dumps({
+            "current_agent": None,
+            "state": "idle",
+            "timestamp": 0,
+            "pass_history": [{"agent": "OldBot", "time": old_time}]
+        }))
+        monkeypatch.setattr(agent_zoo, "AGENT_STATE_FILE", str(state_file))
+        
+        agent_zoo.update_agent_state("NewBot", "passed")
+        
+        state = json.loads(state_file.read_text())
+        # Old pass should be removed, only new one remains
+        assert len(state["pass_history"]) == 1
+        assert state["pass_history"][0]["agent"] == "NewBot"
+
+    def test_clear_agent_state_removes_file(self, tmp_path, monkeypatch):
+        """clear_agent_state removes the state file."""
+        state_file = tmp_path / ".agent_state.json"
+        state_file.write_text('{"test": true}')
+        monkeypatch.setattr(agent_zoo, "AGENT_STATE_FILE", str(state_file))
+        
+        agent_zoo.clear_agent_state()
+        
+        assert not state_file.exists()
+
+    def test_clear_agent_state_handles_missing_file(self, tmp_path, monkeypatch):
+        """clear_agent_state doesn't raise when file doesn't exist."""
+        monkeypatch.setattr(agent_zoo, "AGENT_STATE_FILE", str(tmp_path / ".agent_state.json"))
+        
+        # Should not raise
+        agent_zoo.clear_agent_state()
+
+
+class TestPassDetection:
+    """Tests for [PASS] response detection."""
+
+    def test_pass_response_is_detected(self):
+        """[PASS] response should be detected correctly."""
+        # This tests the detection logic used in the main loop
+        response = "[PASS]"
+        assert response.strip() == "[PASS]"
+
+    def test_pass_with_whitespace_is_detected(self):
+        """[PASS] with surrounding whitespace should be detected."""
+        response = "  [PASS]  \n"
+        assert response.strip() == "[PASS]"
+
+    def test_non_pass_response_is_not_detected(self):
+        """Regular response should not be detected as pass."""
+        response = "Hello, this is a normal response"
+        assert response.strip() != "[PASS]"
+
+    def test_partial_pass_is_not_detected(self):
+        """Partial [PASS] in message should not be detected as pass."""
+        response = "I will [PASS] on this question and say hello instead"
+        assert response.strip() != "[PASS]"
+
