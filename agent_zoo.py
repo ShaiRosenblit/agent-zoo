@@ -106,17 +106,14 @@ def build_participants_context(agents: list[dict], current_agent_name: str) -> s
     
     for agent in agents:
         name = agent.get("name", "Unknown")
-        # Use description if available, otherwise extract first meaningful line from prompt
-        description = agent.get("description", "").strip()
-        if not description:
-            # Extract first line from prompt as fallback
-            prompt = agent.get("prompt", "")
-            first_line = prompt.split("\n")[0].strip() if prompt else ""
-            # Clean up common prefixes
-            for prefix in ["Role:", "You are", "You're"]:
-                if first_line.lower().startswith(prefix.lower()):
-                    first_line = first_line[len(prefix):].strip()
-            description = first_line[:80] if first_line else "AI assistant"
+        # Extract first meaningful line from prompt as the public description
+        prompt = agent.get("prompt", "")
+        first_line = prompt.split("\n")[0].strip() if prompt else ""
+        # Clean up common prefixes
+        for prefix in ["Role:", "You are", "You're"]:
+            if first_line.lower().startswith(prefix.lower()):
+                first_line = first_line[len(prefix):].strip()
+        description = first_line[:80] if first_line else "AI assistant"
         
         marker = " (you)" if name == current_agent_name else ""
         lines.append(f"- {name}{marker}: {description}")
@@ -165,7 +162,7 @@ def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, mo
     response = client.chat.completions.create(
         model=model,
         messages=messages,
-        max_tokens=max_tokens,
+        max_completion_tokens=max_tokens,
     )
 
     content = response.choices[0].message.content
