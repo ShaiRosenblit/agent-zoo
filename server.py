@@ -1106,10 +1106,13 @@ HTML = """
         function renderAgentIndicators(agentState) {
             if (!agentState) return;
             
-            // Clear thinking indicator if state changed to something else
+            // Clear thinking indicator if state changed OR agent changed
             const thinkingIndicator = agentIndicators.querySelector('.thinking');
-            if (thinkingIndicator && agentState.state !== 'thinking') {
-                thinkingIndicator.remove();
+            if (thinkingIndicator) {
+                const currentAgentInIndicator = thinkingIndicator.dataset.agent;
+                if (agentState.state !== 'thinking' || currentAgentInIndicator !== agentState.current_agent) {
+                    thinkingIndicator.remove();
+                }
             }
             
             // Show thinking indicator
@@ -1117,6 +1120,7 @@ HTML = """
                 if (!agentIndicators.querySelector('.thinking')) {
                     const indicator = document.createElement('div');
                     indicator.className = 'agent-indicator thinking';
+                    indicator.dataset.agent = agentState.current_agent;
                     indicator.innerHTML = `
                         <span class="agent-indicator-dot"></span>
                         <span>${escapeHtml(agentState.current_agent)} is thinking...</span>

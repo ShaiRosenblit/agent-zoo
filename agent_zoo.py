@@ -130,6 +130,19 @@ def clear_agent_state() -> None:
         os.remove(AGENT_STATE_FILE)
 
 
+def all_agents_passed(agent_names: list[str]) -> bool:
+    """Check if all agents have passed in recent history (loop detection)."""
+    state = load_agent_state()
+    pass_history = state.get("pass_history", [])
+    
+    if not pass_history or not agent_names:
+        return False
+    
+    # Check if every agent has passed at least once in recent history
+    passed_agents = {p["agent"] for p in pass_history}
+    return all(name in passed_agents for name in agent_names)
+
+
 # --- Channel Operations ---
 
 def read_channel(path: str) -> str:
@@ -176,10 +189,22 @@ Multiple AI agents and humans communicate via a shared text channel.
 Messages are numbered and attributed to their author.
 Respond naturally as yourself, acknowledging other participants when relevant.
 
-If you have nothing meaningful to add to the conversation, respond with exactly [PASS] (nothing else). This signals you're present but choosing not to speak. Use this when:
+CRITICAL - When to use [PASS]:
+If you have nothing meaningful to add, you MUST respond with EXACTLY the text [PASS] and nothing else.
+Do NOT say "I'm quiet", "שותק", "waiting", or any variation - just [PASS].
+Do NOT write "(no response)" or leave empty - write [PASS].
+
+Use [PASS] when:
 - The conversation doesn't require your input
-- Another participant already covered what you would say
-- You're waiting for more context before contributing"""
+- Another participant already covered what you would say  
+- You're waiting for more context before contributing
+- The conversation is stuck in a loop asking for user input
+
+IMPORTANT: Avoid "polite deadlock" loops where agents repeatedly ask the user what they want.
+If agents keep asking "what do you need?" without progress:
+- Take initiative: propose a specific topic or make a concrete suggestion
+- Or respond with [PASS] (literally just that text) to let others drive
+- Do NOT keep rephrasing "tell me what you want" - either DO something or [PASS]"""
 
 
 def build_participants_context(agents: list[dict], current_agent_name: str) -> str:
@@ -448,6 +473,24 @@ def main():
             update_agent_state(agent["name"], "passed")
             print(f"    {agent['name']}: [passed]")
             current_turn = (current_turn + 1) % len(agents)
+            
+            # Check if all agents have passed (conversation stuck)
+            agent_names = [a["name"] for a in agents]
+            if all_agents_passed(agent_names):
+                print("    [all agents passed - waiting for user input]")
+                # Wait for new user message before continuing
+                while not should_stop():
+                    time.sleep(0.5)
+                    new_count = count_messages(channel_path)
+                    if new_count == 0:  # Restart
+                        break
+                    if new_count > last_message_count:
+                        last_author = get_last_author(channel_path)
+                        if last_author == "User":
+                            last_message_count = new_count
+                            current_turn = 0
+                            clear_agent_state()  # Reset pass history
+                            break
             continue
 
         # Append to channel
