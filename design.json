@@ -1,0 +1,374 @@
+{
+  "meta": {
+    "name": "Agent Zoo UI Design Vibes",
+    "version": "1.0.0",
+    "intent": "Design guidance + tokens for a clean, modern, calm, collaboration-focused web UI. Inspired by an airy SaaS dashboard/chat vibe: lots of whitespace, soft neutrals, subtle elevation, rounded shapes, and gentle accent colors. Do not replicate any specific product UI; only follow the overall feel."
+  },
+  "principles": [
+    "Airy, calm, and readable: prioritize whitespace, clear hierarchy, and generous line-height.",
+    "Softly structured: use subtle borders/elevation instead of heavy dividers; keep contrast sufficient.",
+    "Friendly precision: rounded corners, pill controls, and gentle motion; avoid loud gradients or harsh shadows.",
+    "Three-column clarity when useful: navigation left, primary content center, supportive info right.",
+    "Fast scanning: consistent spacing, predictable component patterns, and restrained color usage."
+  ],
+  "layout": {
+    "grid": {
+      "type": "8pt",
+      "baseUnitPx": 8,
+      "containerMaxWidthPx": 1200,
+      "contentGutterPx": 24
+    },
+    "appShell": {
+      "leftNavWidthPx": 260,
+      "rightPanelWidthPx": 320,
+      "topBarHeightPx": 64,
+      "mainContentMinWidthPx": 640,
+      "breakpointsPx": {
+        "sm": 640,
+        "md": 900,
+        "lg": 1200,
+        "xl": 1440
+      },
+      "responsiveBehavior": [
+        "At < md: collapse right panel into a slide-over drawer.",
+        "At < sm: collapse left nav into a hamburger drawer; keep top bar with search/actions.",
+        "Keep primary content as the focus; secondary panels should never crowd the main content."
+      ]
+    },
+    "surfaces": {
+      "pageBackground": "neutral.0",
+      "cardBackground": "surface.1",
+      "panelBackground": "surface.1",
+      "elevationStrategy": "Use borders + very soft shadows. Avoid heavy drop shadows and strong outlines."
+    }
+  },
+  "color": {
+    "mode": "light-first",
+    "palette": {
+      "neutral": {
+        "0": "#FAFAFB",
+        "50": "#F4F5F7",
+        "100": "#E9EBEF",
+        "200": "#D6DAE3",
+        "300": "#B8BFCD",
+        "400": "#8A94A6",
+        "500": "#5B667A",
+        "600": "#3F4859",
+        "700": "#2C3240",
+        "800": "#1F2430",
+        "900": "#141722"
+      },
+      "surface": {
+        "0": "#FFFFFF",
+        "1": "#FFFFFF",
+        "2": "#F9FAFC"
+      },
+      "accent": {
+        "primary": {
+          "50": "#EEF4FF",
+          "100": "#D9E6FF",
+          "500": "#4C7DFF",
+          "600": "#3A67E6"
+        },
+        "secondary": {
+          "50": "#F4F0FF",
+          "100": "#E6DBFF",
+          "500": "#7B61FF",
+          "600": "#664DE6"
+        },
+        "highlight": {
+          "50": "#EEFFF5",
+          "100": "#D7FBE7",
+          "500": "#2ECC71",
+          "600": "#28B863"
+        }
+      },
+      "status": {
+        "success": "#22C55E",
+        "warning": "#F59E0B",
+        "danger": "#EF4444",
+        "info": "#3B82F6"
+      }
+    },
+    "tokens": {
+      "text": {
+        "primary": "neutral.800",
+        "secondary": "neutral.600",
+        "muted": "neutral.500",
+        "inverse": "surface.0"
+      },
+      "border": {
+        "subtle": "neutral.100",
+        "default": "neutral.200",
+        "strong": "neutral.300",
+        "focusRing": "accent.primary.500"
+      },
+      "fill": {
+        "page": "neutral.0",
+        "card": "surface.0",
+        "cardMuted": "surface.2",
+        "selection": "accent.primary.50"
+      },
+      "interactive": {
+        "primary": "accent.primary.500",
+        "primaryHover": "accent.primary.600",
+        "secondary": "neutral.800",
+        "secondaryHover": "neutral.900",
+        "ghostHover": "neutral.50"
+      }
+    },
+    "usageGuidelines": [
+      "Keep the UI mostly neutral. Use accents sparingly for active states, primary actions, and small highlights.",
+      "Prefer soft-tinted backgrounds (accent.*.50) over saturated fills for large areas.",
+      "Always maintain readable contrast: body text should meet WCAG AA."
+    ]
+  },
+  "typography": {
+    "fontFamilies": {
+      "sans": [
+        "ui-sans-serif",
+        "system-ui",
+        "-apple-system",
+        "Segoe UI",
+        "Roboto",
+        "Inter",
+        "Helvetica Neue",
+        "Arial",
+        "Noto Sans",
+        "Apple Color Emoji",
+        "Segoe UI Emoji"
+      ],
+      "mono": [
+        "ui-monospace",
+        "SFMono-Regular",
+        "Menlo",
+        "Monaco",
+        "Consolas",
+        "Liberation Mono",
+        "Courier New",
+        "monospace"
+      ]
+    },
+    "scalePx": {
+      "xs": 12,
+      "sm": 14,
+      "md": 16,
+      "lg": 18,
+      "xl": 22,
+      "2xl": 28
+    },
+    "lineHeights": {
+      "tight": 1.2,
+      "default": 1.5,
+      "relaxed": 1.65
+    },
+    "weights": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600
+    },
+    "hierarchy": {
+      "pageTitle": {
+        "size": "xl",
+        "weight": "semibold"
+      },
+      "sectionTitle": {
+        "size": "lg",
+        "weight": "semibold"
+      },
+      "body": {
+        "size": "md",
+        "weight": "regular"
+      },
+      "caption": {
+        "size": "sm",
+        "weight": "regular"
+      }
+    }
+  },
+  "spacingPx": {
+    "0": 0,
+    "1": 4,
+    "2": 8,
+    "3": 12,
+    "4": 16,
+    "5": 20,
+    "6": 24,
+    "8": 32,
+    "10": 40,
+    "12": 48,
+    "16": 64
+  },
+  "radiiPx": {
+    "xs": 6,
+    "sm": 10,
+    "md": 14,
+    "lg": 18,
+    "pill": 9999
+  },
+  "borders": {
+    "widthPx": {
+      "hairline": 1,
+      "emphasis": 2
+    },
+    "style": "solid"
+  },
+  "shadows": {
+    "elevation": {
+      "0": "none",
+      "1": "0 1px 2px rgba(20, 23, 34, 0.06)",
+      "2": "0 6px 18px rgba(20, 23, 34, 0.08)",
+      "3": "0 14px 32px rgba(20, 23, 34, 0.10)"
+    },
+    "guidelines": [
+      "Use elevation 1 for cards and small popovers, 2 for panels/modals, 3 for high-priority overlays.",
+      "Prefer borders for structure; shadows should feel barely-there."
+    ]
+  },
+  "iconography": {
+    "style": "simple line icons with rounded joins",
+    "strokeWidthPx": 1.75,
+    "sizesPx": {
+      "sm": 16,
+      "md": 20,
+      "lg": 24
+    }
+  },
+  "motion": {
+    "durationsMs": {
+      "fast": 120,
+      "base": 180,
+      "slow": 260
+    },
+    "easings": {
+      "standard": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      "emphasized": "cubic-bezier(0.2, 0.9, 0.2, 1)"
+    },
+    "guidelines": [
+      "Animations should be subtle and functional (state changes, drawer transitions).",
+      "Avoid bouncy motion; keep it calm and professional.",
+      "Respect reduced motion preferences: disable non-essential transitions."
+    ]
+  },
+  "components": {
+    "buttons": {
+      "shape": "rounded (md) or pill for primary CTA",
+      "sizes": {
+        "sm": { "heightPx": 32, "paddingX": 12, "fontSize": "sm" },
+        "md": { "heightPx": 40, "paddingX": 16, "fontSize": "sm" },
+        "lg": { "heightPx": 48, "paddingX": 18, "fontSize": "md" }
+      },
+      "variants": [
+        "primary: solid accent primary",
+        "secondary: subtle neutral fill with border",
+        "ghost: transparent with hover fill",
+        "danger: red for destructive actions only"
+      ],
+      "states": [
+        "hover: slightly darker fill or neutral hover wash",
+        "active: subtle press (translateY 1px) optional",
+        "focus: 2px focus ring (border.focusRing) with 2px offset",
+        "disabled: reduce opacity and remove shadow"
+      ]
+    },
+    "inputs": {
+      "shape": "rounded md",
+      "heightPx": 40,
+      "background": "surface.0",
+      "border": "border.default",
+      "focus": "border.focusRing + subtle tinted background",
+      "placeholder": "text.muted",
+      "guidelines": [
+        "Prefer embedded leading icons for search and filter fields.",
+        "Use helper text and validation messages below the field, not inside."
+      ]
+    },
+    "cards": {
+      "shape": "rounded lg",
+      "paddingPx": 16,
+      "border": "border.subtle",
+      "shadow": "elevation.1",
+      "header": "title + optional subtle actions on right",
+      "contentDensity": "comfortable; avoid cramped layouts"
+    },
+    "navigation": {
+      "leftNav": {
+        "style": "icon + label, ample vertical spacing",
+        "activeState": "soft tinted background + medium weight label",
+        "sectioning": "group related items with small section headers"
+      },
+      "topBar": {
+        "contains": [
+          "page title/breadcrumb",
+          "search (optional)",
+          "global actions (notifications/settings)"
+        ],
+        "visual": "thin bottom border; no heavy shadow"
+      }
+    },
+    "lists": {
+      "rowHeightPx": 44,
+      "rowHover": "fill.selection",
+      "dividers": "use subtle borders or spacing, not heavy lines"
+    },
+    "chat": {
+      "bubbleShape": "rounded lg with slightly larger radius than cards",
+      "bubbleMaxWidthPercent": 72,
+      "bubbleSpacingPx": 10,
+      "incomingStyle": "neutral tinted surface with subtle border",
+      "outgoingStyle": "soft accent tint (accent.secondary.50) or neutral with stronger emphasis",
+      "timestamp": "caption style, muted",
+      "composer": {
+        "position": "sticky at bottom of content pane",
+        "shape": "rounded lg",
+        "actions": "attach/plus on left, send CTA on right"
+      }
+    },
+    "panels": {
+      "rightPanel": {
+        "purpose": "supporting context (people, metadata, files, settings)",
+        "visual": "same card/panel style as main; keep density slightly higher than main content"
+      },
+      "drawers": {
+        "overlay": "light scrim rgba(20,23,34,0.25)",
+        "shadow": "elevation.2",
+        "widthPercentMobile": 92
+      }
+    }
+  },
+  "contentStyle": {
+    "tone": "helpful, concise, and calm",
+    "microcopyGuidelines": [
+      "Use short labels (1–2 words) and clear verbs (Send, Save, Pause).",
+      "Prefer sentence case. Avoid shouting (ALL CAPS) except for tiny tags.",
+      "Provide empty states that guide the next action in one sentence."
+    ]
+  },
+  "accessibility": {
+    "contrast": {
+      "bodyTextMinimum": "WCAG AA",
+      "nonTextUI": "WCAG AA where applicable"
+    },
+    "focus": {
+      "mustBeVisible": true,
+      "ringWidthPx": 2,
+      "ringOffsetPx": 2
+    },
+    "hitTargets": {
+      "minimumPx": 40
+    },
+    "keyboard": [
+      "All interactive elements reachable via Tab.",
+      "Visible focus state on all components.",
+      "Escape closes dialogs/drawers; Enter activates primary action where appropriate."
+    ],
+    "reducedMotion": "Respect prefers-reduced-motion; remove non-essential transitions."
+  },
+  "doNotDo": [
+    "Do not use heavy drop shadows, neon accents, or high-saturation full-bleed gradients.",
+    "Do not overuse dividers; prefer spacing and subtle borders.",
+    "Do not cram multiple dense toolbars into the primary content area.",
+    "Do not rely on color alone to convey status (also use icons/text)."
+  ]
+}
+

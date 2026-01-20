@@ -36,19 +36,80 @@ HTML = """
 <html>
 <head>
     <title>Agent Zoo</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            /* Neutral palette */
+            --neutral-0: #FAFAFB;
+            --neutral-50: #F4F5F7;
+            --neutral-100: #E9EBEF;
+            --neutral-200: #D6DAE3;
+            --neutral-300: #B8BFCD;
+            --neutral-400: #8A94A6;
+            --neutral-500: #5B667A;
+            --neutral-600: #3F4859;
+            --neutral-700: #2C3240;
+            --neutral-800: #1F2430;
+            --neutral-900: #141722;
+            
+            /* Surface */
+            --surface-0: #FFFFFF;
+            --surface-1: #FFFFFF;
+            --surface-2: #F9FAFC;
+            
+            /* Accent colors */
+            --primary-50: #EEF4FF;
+            --primary-100: #D9E6FF;
+            --primary-500: #4C7DFF;
+            --primary-600: #3A67E6;
+            
+            --secondary-50: #F4F0FF;
+            --secondary-100: #E6DBFF;
+            --secondary-500: #7B61FF;
+            --secondary-600: #664DE6;
+            
+            --highlight-50: #EEFFF5;
+            --highlight-100: #D7FBE7;
+            --highlight-500: #2ECC71;
+            --highlight-600: #28B863;
+            
+            /* Status */
+            --success: #22C55E;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --info: #3B82F6;
+            
+            /* Typography */
+            --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            
+            /* Shadows */
+            --shadow-1: 0 1px 2px rgba(20, 23, 34, 0.06);
+            --shadow-2: 0 6px 18px rgba(20, 23, 34, 0.08);
+            --shadow-3: 0 14px 32px rgba(20, 23, 34, 0.10);
+            
+            /* Radii */
+            --radius-xs: 6px;
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
+            --radius-pill: 9999px;
+            
+            /* Motion */
+            --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+            --duration-fast: 120ms;
+            --duration-base: 180ms;
+        }
+        
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
-            font-family: 'Space Grotesk', sans-serif;
-            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            font-family: var(--font-sans);
+            background: var(--neutral-0);
             min-height: 100vh;
-            color: #e0e0e0;
-            padding: 2rem;
+            color: var(--neutral-800);
+            padding: 32px;
             padding-bottom: 200px;
+            line-height: 1.5;
         }
         
         .container {
@@ -57,48 +118,48 @@ HTML = """
         }
         
         h1 {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(90deg, #00d9ff, #00ff88);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--neutral-800);
         }
         
         .subtitle {
-            color: #666;
-            margin-bottom: 2rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
+            color: var(--neutral-500);
+            margin-bottom: 32px;
+            font-family: var(--font-mono);
+            font-size: 14px;
         }
         
         .token-count {
-            color: #555;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
+            color: var(--neutral-400);
+            font-family: var(--font-mono);
+            font-size: 12px;
             position: fixed;
-            top: 1rem;
-            right: 1.5rem;
-            background: rgba(15, 15, 26, 0.8);
-            padding: 0.3rem 0.6rem;
-            border-radius: 4px;
-            border: 1px solid rgba(255,255,255,0.05);
+            top: 16px;
+            right: 24px;
+            background: var(--surface-0);
+            padding: 6px 12px;
+            border-radius: var(--radius-xs);
+            border: 1px solid var(--neutral-100);
+            box-shadow: var(--shadow-1);
         }
         
         #channel {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 16px;
         }
         
         .message {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px;
-            padding: 1.25rem;
-            animation: fadeIn 0.4s ease-out;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-100);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            animation: fadeIn 0.26s var(--ease-standard);
             position: relative;
             overflow: hidden;
+            box-shadow: var(--shadow-1);
         }
         
         .message::before {
@@ -108,64 +169,64 @@ HTML = """
             left: 0;
             width: 4px;
             height: 100%;
-            background: #888;
+            background: var(--neutral-300);
         }
         
-        .message.user::before { background: #00d9ff; }
-        .message.user .message-author { color: #00d9ff; }
+        .message.user::before { background: var(--primary-500); }
+        .message.user .message-author { color: var(--primary-600); }
         
         .message-header {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 0.75rem;
+            gap: 12px;
+            margin-bottom: 12px;
         }
         
         .message-index {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            color: #555;
-            background: rgba(255,255,255,0.05);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--neutral-400);
+            background: var(--neutral-50);
+            padding: 4px 8px;
+            border-radius: var(--radius-xs);
         }
         
         .message-author {
             font-weight: 600;
-            font-size: 1.1rem;
-            color: #aaa;
+            font-size: 18px;
+            color: var(--neutral-700);
         }
         
         .message-content {
-            font-size: 1rem;
-            line-height: 1.7;
+            font-size: 16px;
+            line-height: 1.65;
             white-space: pre-wrap;
-            color: #ccc;
+            color: var(--neutral-600);
         }
         
         .status {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            color: #00ff88;
-            margin-bottom: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--highlight-600);
+            margin-bottom: 24px;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 8px;
         }
         
         .status-dot {
             width: 8px;
             height: 8px;
-            background: #00ff88;
+            background: var(--highlight-500);
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
         
-        .status-dot.paused { background: #ffd700; animation: none; }
-        .status-dot.stopped { background: #ff6b6b; animation: none; }
+        .status-dot.paused { background: var(--warning); animation: none; }
+        .status-dot.stopped { background: var(--danger); animation: none; }
         
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
         }
         
@@ -174,207 +235,240 @@ HTML = """
             50% { opacity: 0.4; }
         }
         
+        @media (prefers-reduced-motion: reduce) {
+            .message, .status-dot { animation: none; }
+        }
+        
         .empty {
-            color: #555;
-            font-style: italic;
-            padding: 2rem;
+            color: var(--neutral-400);
+            font-size: 14px;
+            padding: 40px;
             text-align: center;
-            border: 1px dashed rgba(255,255,255,0.1);
-            border-radius: 12px;
+            border: 1px dashed var(--neutral-200);
+            border-radius: var(--radius-lg);
+            background: var(--surface-2);
         }
         
         /* Agents Panel */
         .agents-toggle {
             position: fixed;
-            top: 1rem;
-            left: 1rem;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #888;
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
+            top: 16px;
+            left: 16px;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-200);
+            color: var(--neutral-600);
+            padding: 8px 12px;
+            border-radius: var(--radius-xs);
             cursor: pointer;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            font-size: 12px;
             z-index: 100;
+            box-shadow: var(--shadow-1);
+            transition: all var(--duration-fast) var(--ease-standard);
         }
         
-        .agents-toggle:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+        .agents-toggle:hover { 
+            background: var(--neutral-50); 
+            color: var(--neutral-800);
+            border-color: var(--neutral-300);
+        }
         
         .agents-panel {
             position: fixed;
             top: 0;
-            left: -360px;
-            width: 350px;
+            left: -340px;
+            width: 320px;
             height: 100vh;
-            background: #12121f;
-            border-right: 1px solid rgba(255,255,255,0.1);
-            padding: 1rem;
+            background: var(--surface-0);
+            border-right: 1px solid var(--neutral-100);
+            padding: 16px;
             overflow-y: auto;
-            transition: left 0.3s ease;
+            transition: left 0.26s var(--ease-standard);
             z-index: 99;
+            box-shadow: var(--shadow-2);
         }
         
         .agents-panel.open { left: 0; }
         
         .agents-panel h2 {
-            font-size: 1rem;
-            color: #888;
-            margin-bottom: 1rem;
-            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--neutral-500);
+            margin-bottom: 16px;
+            font-family: var(--font-mono);
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            font-weight: 500;
         }
         
         .global-section {
-            background: rgba(0, 255, 136, 0.05);
-            border: 1px solid rgba(0, 255, 136, 0.15);
-            border-radius: 8px;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
+            background: var(--highlight-50);
+            border: 1px solid var(--highlight-100);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            margin-bottom: 16px;
         }
         
         .global-section h3 {
-            font-size: 0.75rem;
-            color: #00ff88;
-            margin-bottom: 0.5rem;
-            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--highlight-600);
+            margin-bottom: 8px;
+            font-family: var(--font-mono);
             text-transform: uppercase;
             letter-spacing: 0.03em;
+            font-weight: 600;
         }
         
         .global-section p {
-            font-size: 0.7rem;
-            color: #666;
-            margin-bottom: 0.5rem;
-            line-height: 1.4;
+            font-size: 12px;
+            color: var(--neutral-500);
+            margin-bottom: 8px;
+            line-height: 1.5;
         }
         
         #global-prompt {
             width: 100%;
-            background: rgba(0,0,0,0.2);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 4px;
-            color: #ccc;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            padding: 0.5rem;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-xs);
+            color: var(--neutral-700);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 8px;
             resize: vertical;
             min-height: 60px;
             outline: none;
+            transition: border-color var(--duration-fast) var(--ease-standard);
         }
         
-        #global-prompt:focus { border-color: #00ff88; }
-        #global-prompt::placeholder { color: #444; }
+        #global-prompt:focus { border-color: var(--highlight-500); background: var(--highlight-50); }
+        #global-prompt::placeholder { color: var(--neutral-400); }
         
         .agent-card {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 8px;
-            padding: 0.75rem;
-            margin-bottom: 0.75rem;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-100);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-1);
         }
         
         .agent-card-header {
             display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .agent-card-header-top {
+            display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.5rem;
+        }
+        
+        .agent-card-header-selects {
+            display: flex;
+            gap: 6px;
+            align-items: center;
         }
         
         .agent-name-input {
             background: transparent;
             border: none;
-            color: #e0e0e0;
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 1rem;
+            color: var(--neutral-800);
+            font-family: var(--font-sans);
+            font-size: 16px;
             font-weight: 600;
-            width: 140px;
+            flex: 1;
+            min-width: 0;
             outline: none;
             border-bottom: 1px solid transparent;
+            transition: border-color var(--duration-fast) var(--ease-standard);
         }
         
-        .agent-name-input:focus { border-bottom-color: #00d9ff; }
+        .agent-name-input:focus { border-bottom-color: var(--primary-500); }
         
         .agent-model-select {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 4px;
-            color: #888;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.65rem;
-            padding: 0.2rem 0.3rem;
+            background: var(--surface-2);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-xs);
+            color: var(--neutral-600);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 4px 8px;
             outline: none;
             cursor: pointer;
+            transition: border-color var(--duration-fast) var(--ease-standard);
         }
         
-        .agent-model-select:focus { border-color: #00d9ff; }
+        .agent-model-select:focus { border-color: var(--primary-500); }
         
         .agent-reasoning-select {
-            background: rgba(255, 200, 0, 0.1);
-            border: 1px solid rgba(255, 200, 0, 0.2);
-            border-radius: 4px;
-            color: #ffd700;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.6rem;
-            padding: 0.15rem 0.25rem;
+            background: var(--secondary-50);
+            border: 1px solid var(--secondary-100);
+            border-radius: var(--radius-xs);
+            color: var(--secondary-600);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 4px 8px;
             outline: none;
             cursor: pointer;
-            margin-left: 0.25rem;
         }
         
-        .agent-reasoning-select:focus { border-color: #ffd700; }
+        .agent-reasoning-select:focus { border-color: var(--secondary-500); }
         .agent-reasoning-select.hidden { display: none; }
         
         .agent-prompt-input {
             width: 100%;
-            background: rgba(0,0,0,0.2);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 4px;
-            color: #ccc;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            padding: 0.5rem;
+            background: var(--surface-2);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-xs);
+            color: var(--neutral-700);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 8px;
             resize: vertical;
             min-height: 60px;
             outline: none;
+            transition: border-color var(--duration-fast) var(--ease-standard);
         }
         
-        .agent-prompt-input:focus { border-color: #00d9ff; }
-        
+        .agent-prompt-input:focus { border-color: var(--primary-500); background: var(--primary-50); }
         
         .agent-delete {
             background: none;
             border: none;
-            color: #ff6b6b;
+            color: var(--danger);
             cursor: pointer;
-            padding: 0.25rem;
+            padding: 4px;
             opacity: 0.5;
-            font-size: 1rem;
+            font-size: 16px;
+            transition: opacity var(--duration-fast) var(--ease-standard);
         }
         
         .agent-delete:hover { opacity: 1; }
         
         .add-agent-btn {
             width: 100%;
-            padding: 0.75rem;
-            background: rgba(0, 217, 255, 0.1);
-            border: 1px dashed rgba(0, 217, 255, 0.3);
-            border-radius: 8px;
-            color: #00d9ff;
-            font-family: 'Space Grotesk', sans-serif;
+            padding: 12px;
+            background: var(--primary-50);
+            border: 1px dashed var(--primary-500);
+            border-radius: var(--radius-sm);
+            color: var(--primary-600);
+            font-family: var(--font-sans);
+            font-weight: 500;
             cursor: pointer;
-            margin-top: 0.5rem;
+            margin-top: 8px;
+            transition: all var(--duration-fast) var(--ease-standard);
         }
         
-        .add-agent-btn:hover { background: rgba(0, 217, 255, 0.2); }
+        .add-agent-btn:hover { background: var(--primary-100); }
         
         .new-agent-form {
-            background: rgba(0, 217, 255, 0.05);
-            border: 1px solid rgba(0, 217, 255, 0.2);
-            border-radius: 8px;
-            padding: 0.75rem;
-            margin-top: 0.5rem;
+            background: var(--primary-50);
+            border: 1px solid var(--primary-100);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            margin-top: 8px;
             display: none;
         }
         
@@ -383,52 +477,55 @@ HTML = """
         .new-agent-form input,
         .new-agent-form textarea {
             width: 100%;
-            margin-bottom: 0.5rem;
+            margin-bottom: 8px;
         }
         
         .new-agent-form input {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 4px;
-            color: #e0e0e0;
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 0.9rem;
-            padding: 0.5rem;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-xs);
+            color: var(--neutral-800);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            padding: 8px;
             outline: none;
+            transition: border-color var(--duration-fast) var(--ease-standard);
         }
         
-        .new-agent-form input:focus { border-color: #00d9ff; }
+        .new-agent-form input:focus { border-color: var(--primary-500); }
         
         .new-agent-form select {
             width: 100%;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 4px;
-            color: #e0e0e0;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            padding: 0.5rem;
-            margin-bottom: 0.5rem;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-xs);
+            color: var(--neutral-700);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            padding: 8px;
+            margin-bottom: 8px;
             outline: none;
             cursor: pointer;
+            transition: border-color var(--duration-fast) var(--ease-standard);
         }
         
-        .new-agent-form select:focus { border-color: #00d9ff; }
+        .new-agent-form select:focus { border-color: var(--primary-500); }
         
         .new-agent-form textarea {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 4px;
-            color: #ccc;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            padding: 0.5rem;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-xs);
+            color: var(--neutral-700);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 8px;
             resize: vertical;
             min-height: 80px;
             outline: none;
+            transition: border-color var(--duration-fast) var(--ease-standard);
         }
         
-        .new-agent-form textarea:focus { border-color: #00d9ff; }
+        .new-agent-form textarea:focus { border-color: var(--primary-500); }
         
         .prompt-row {
             position: relative;
@@ -436,39 +533,49 @@ HTML = """
         
         .enrich-btn {
             position: absolute;
-            top: 0.25rem;
-            right: 0.25rem;
-            padding: 0.25rem 0.5rem;
-            font-size: 0.65rem;
-            background: rgba(255, 215, 0, 0.2);
-            color: #ffd700;
-            border: 1px solid rgba(255, 215, 0, 0.3);
-            border-radius: 4px;
+            top: 4px;
+            right: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            background: var(--secondary-50);
+            color: var(--secondary-600);
+            border: 1px solid var(--secondary-100);
+            border-radius: var(--radius-xs);
             cursor: pointer;
+            font-weight: 500;
+            transition: all var(--duration-fast) var(--ease-standard);
         }
         
-        .enrich-btn:hover { background: rgba(255, 215, 0, 0.3); }
+        .enrich-btn:hover { background: var(--secondary-100); }
         .enrich-btn:disabled { opacity: 0.5; cursor: wait; }
         
         .new-agent-actions {
             display: flex;
-            gap: 0.5rem;
+            gap: 8px;
         }
         
         .new-agent-actions button {
             flex: 1;
-            padding: 0.5rem;
-            font-size: 0.8rem;
+            padding: 8px;
+            font-size: 13px;
         }
         
         .confirm-btn {
-            background: linear-gradient(135deg, #00d9ff, #00ff88);
-            color: #0f0f1a;
+            background: var(--primary-500);
+            color: white;
+        }
+        
+        .confirm-btn:hover {
+            background: var(--primary-600);
         }
         
         .cancel-btn {
-            background: rgba(255,255,255,0.1);
-            color: #888;
+            background: var(--neutral-100);
+            color: var(--neutral-600);
+        }
+        
+        .cancel-btn:hover {
+            background: var(--neutral-200);
         }
         
         /* Control panel */
@@ -477,19 +584,24 @@ HTML = """
             bottom: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(to top, #0f0f1a 0%, #0f0f1a 90%, transparent 100%);
-            padding: 1rem 2rem 1.5rem;
+            background: linear-gradient(to top, var(--neutral-0) 0%, var(--neutral-0) 85%, transparent 100%);
+            padding: 16px 32px 24px;
         }
         
         .control-container {
             max-width: 800px;
             margin: 0 auto;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-100);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow-2);
         }
         
         .controls-row {
             display: flex;
-            gap: 1.5rem;
-            margin-bottom: 1rem;
+            gap: 24px;
+            margin-bottom: 16px;
             align-items: center;
             flex-wrap: wrap;
         }
@@ -497,93 +609,97 @@ HTML = """
         .control-group {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 8px;
         }
         
         .control-group label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            color: #888;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--neutral-500);
             text-transform: uppercase;
         }
         
         .control-group input[type="number"] {
             width: 80px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 6px;
-            padding: 0.5rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
-            color: #e0e0e0;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-xs);
+            padding: 8px;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--neutral-800);
             outline: none;
+            transition: border-color var(--duration-fast) var(--ease-standard);
         }
         
-        .control-group input[type="number"]:focus { border-color: #00d9ff; }
+        .control-group input[type="number"]:focus { border-color: var(--primary-500); }
         
         .input-row {
             display: flex;
-            gap: 0.75rem;
+            gap: 12px;
         }
         
         #user-input {
             flex: 1;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 8px;
-            padding: 0.875rem 1rem;
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 1rem;
-            color: #e0e0e0;
+            background: var(--surface-0);
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            font-family: var(--font-sans);
+            font-size: 16px;
+            color: var(--neutral-800);
             outline: none;
+            transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
         }
         
-        #user-input:focus { border-color: #00d9ff; }
-        #user-input::placeholder { color: #555; }
+        #user-input:focus { border-color: var(--primary-500); background: var(--primary-50); }
+        #user-input::placeholder { color: var(--neutral-400); }
         
         button {
-            padding: 0.75rem 1.25rem;
+            padding: 12px 20px;
             border: none;
-            border-radius: 8px;
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 0.9rem;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-sans);
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--duration-fast) var(--ease-standard);
         }
         
         #send-btn {
-            background: linear-gradient(135deg, #00d9ff, #00ff88);
-            color: #0f0f1a;
+            background: var(--primary-500);
+            color: white;
+            border-radius: var(--radius-pill);
+            padding: 12px 24px;
         }
         
-        #send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3); }
+        #send-btn:hover { background: var(--primary-600); transform: translateY(-1px); box-shadow: var(--shadow-2); }
         #send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
         
         #pause-btn {
-            background: rgba(255, 215, 0, 0.2);
-            color: #ffd700;
-            border: 1px solid #ffd700;
+            background: var(--surface-0);
+            color: var(--warning);
+            border: 1px solid var(--warning);
         }
         
-        #pause-btn:hover { background: rgba(255, 215, 0, 0.3); }
-        #pause-btn.paused { background: #ffd700; color: #0f0f1a; }
+        #pause-btn:hover { background: rgba(245, 158, 11, 0.1); }
+        #pause-btn.paused { background: var(--warning); color: white; }
         
         #stop-btn {
-            background: rgba(255, 107, 107, 0.2);
-            color: #ff6b6b;
-            border: 1px solid #ff6b6b;
+            background: var(--surface-0);
+            color: var(--danger);
+            border: 1px solid var(--danger);
         }
         
-        #stop-btn:hover { background: rgba(255, 107, 107, 0.3); }
+        #stop-btn:hover { background: rgba(239, 68, 68, 0.1); }
         
         #restart-btn {
-            background: rgba(0, 217, 255, 0.2);
-            color: #00d9ff;
-            border: 1px solid #00d9ff;
+            background: var(--surface-0);
+            color: var(--primary-500);
+            border: 1px solid var(--primary-500);
         }
         
-        #restart-btn:hover { background: rgba(0, 217, 255, 0.3); }
+        #restart-btn:hover { background: var(--primary-50); }
     </style>
 </head>
 <body>
@@ -743,10 +859,14 @@ HTML = """
                 const showReasoning = supportsReasoningEffort(agent.model || 'gpt-4o');
                 card.innerHTML = `
                     <div class="agent-card-header">
-                        <input type="text" class="agent-name-input" value="${escapeHtml(agent.name)}" data-idx="${idx}" data-field="name" />
-                        <select class="agent-model-select" data-idx="${idx}" data-field="model">${modelOptions}</select>
-                        <select class="agent-reasoning-select ${showReasoning ? '' : 'hidden'}" data-idx="${idx}" data-field="reasoning_effort" title="Reasoning effort">${reasoningOptions}</select>
-                        <button class="agent-delete" data-idx="${idx}">&times;</button>
+                        <div class="agent-card-header-top">
+                            <input type="text" class="agent-name-input" value="${escapeHtml(agent.name)}" data-idx="${idx}" data-field="name" />
+                            <button class="agent-delete" data-idx="${idx}">&times;</button>
+                        </div>
+                        <div class="agent-card-header-selects">
+                            <select class="agent-model-select" data-idx="${idx}" data-field="model">${modelOptions}</select>
+                            <select class="agent-reasoning-select ${showReasoning ? '' : 'hidden'}" data-idx="${idx}" data-field="reasoning_effort" title="Reasoning effort">${reasoningOptions}</select>
+                        </div>
                     </div>
                     <textarea class="agent-prompt-input" data-idx="${idx}" data-field="prompt" rows="3">${escapeHtml(agent.prompt)}</textarea>
                 `;
