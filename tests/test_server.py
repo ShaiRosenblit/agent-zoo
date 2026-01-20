@@ -38,7 +38,7 @@ class TestGetSettings:
         assert response.status_code == 200
         data = response.get_json()
         assert data["max_tokens"] == 512
-        assert data["delay_seconds"] == 5
+        assert data["delay_seconds"] == 0
         assert data["paused"] is False
         assert data["global_prompt"] == ""
         assert data["agents"] == []
@@ -151,7 +151,7 @@ class TestPostSettings:
         # Set initial state
         settings_file.write_text(json.dumps({
             "max_tokens": 512,
-            "delay_seconds": 5,
+            "delay_seconds": 0,
             "paused": False,
             "global_prompt": "Original",
             "agents": [{"name": "Bot"}]

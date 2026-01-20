@@ -20,7 +20,7 @@ class TestSettings:
         
         assert settings == agent_zoo.DEFAULT_SETTINGS
         assert settings["max_tokens"] == 512
-        assert settings["delay_seconds"] == 5
+        assert settings["delay_seconds"] == 0
         assert settings["paused"] is False
         assert settings["global_prompt"] == ""
         assert settings["agents"] == []

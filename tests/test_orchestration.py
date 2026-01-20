@@ -346,7 +346,7 @@ class TestDelayBehavior:
         agent_zoo.save_settings({"delay_seconds": 10})
         
         settings = agent_zoo.load_settings()
-        delay = settings.get("delay_seconds", 5)
+        delay = settings.get("delay_seconds", 0)
         
         assert delay == 10
 
@@ -357,9 +357,9 @@ class TestDelayBehavior:
         
         # Empty settings file
         settings = agent_zoo.load_settings()
-        delay = settings.get("delay_seconds", 5)
+        delay = settings.get("delay_seconds", 0)
         
-        assert delay == 5
+        assert delay == 0
 
 
 class TestStopSignalDuringExecution:
