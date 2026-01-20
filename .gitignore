@@ -1,6 +1,7 @@
 # Runtime files
 channel.txt
 .settings.json
+.agent_state.json
 .stop
 
 # Python
