@@ -29,6 +29,7 @@ DEFAULT_SETTINGS = {
     "max_tokens": 512,
     "delay_seconds": 5,
     "paused": False,
+    "global_prompt": "",
     "agents": []
 }
 
@@ -91,12 +92,66 @@ def get_last_author(path: str) -> str | None:
     return None
 
 
+# --- Global Context ---
+
+ENVIRONMENT_CONTEXT = """You are participating in a multi-agent conversation channel.
+Multiple AI agents and humans communicate via a shared text channel.
+Messages are numbered and attributed to their author.
+Respond naturally as yourself, acknowledging other participants when relevant."""
+
+
+def build_participants_context(agents: list[dict], current_agent_name: str) -> str:
+    """Build a description of all participants for the global context."""
+    lines = ["Current participants:"]
+    
+    for agent in agents:
+        name = agent.get("name", "Unknown")
+        # Use description if available, otherwise extract first meaningful line from prompt
+        description = agent.get("description", "").strip()
+        if not description:
+            # Extract first line from prompt as fallback
+            prompt = agent.get("prompt", "")
+            first_line = prompt.split("\n")[0].strip() if prompt else ""
+            # Clean up common prefixes
+            for prefix in ["Role:", "You are", "You're"]:
+                if first_line.lower().startswith(prefix.lower()):
+                    first_line = first_line[len(prefix):].strip()
+            description = first_line[:80] if first_line else "AI assistant"
+        
+        marker = " (you)" if name == current_agent_name else ""
+        lines.append(f"- {name}{marker}: {description}")
+    
+    lines.append("- User: Human participant")
+    return "\n".join(lines)
+
+
+def build_global_context(agents: list[dict], current_agent_name: str, user_instructions: str) -> str:
+    """Assemble the complete global context from all three layers."""
+    parts = [ENVIRONMENT_CONTEXT]
+    
+    # Add participants context
+    participants = build_participants_context(agents, current_agent_name)
+    parts.append(participants)
+    
+    # Add user instructions if provided
+    if user_instructions and user_instructions.strip():
+        parts.append(f"Additional instructions from the session host:\n{user_instructions.strip()}")
+    
+    return "\n\n".join(parts)
+
+
 # --- Agent ---
 
-def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, model: str, client: OpenAI) -> str:
+def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, model: str, client: OpenAI, global_context: str = "") -> str:
     """Generate a response for an agent."""
+    # Combine global context with agent's personal prompt
+    if global_context:
+        full_prompt = f"{global_context}\n\n---\n\nYour personal instructions:\n{prompt}"
+    else:
+        full_prompt = prompt
+    
     messages = [
-        {"role": "system", "content": prompt},
+        {"role": "system", "content": full_prompt},
         {
             "role": "user",
             "content": (
@@ -267,10 +322,14 @@ def main():
         # Read current channel state
         channel_content = read_channel(channel_path)
 
+        # Build global context for this agent
+        user_instructions = settings.get("global_prompt", "")
+        global_context = build_global_context(agents, agent["name"], user_instructions)
+
         # Generate response
         max_tokens = settings.get("max_tokens", 512)
         model = agent.get("model", "gpt-4o")
-        response = call_agent(agent["name"], agent["prompt"], channel_content, max_tokens, model, client)
+        response = call_agent(agent["name"], agent["prompt"], channel_content, max_tokens, model, client, global_context)
 
         # Check stop again before writing
         if should_stop():

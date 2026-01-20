@@ -27,6 +27,7 @@ DEFAULT_SETTINGS = {
     "max_tokens": 512,
     "delay_seconds": 5,
     "paused": False,
+    "global_prompt": "",
     "agents": []
 }
 
@@ -225,6 +226,47 @@ HTML = """
             letter-spacing: 0.05em;
         }
         
+        .global-section {
+            background: rgba(0, 255, 136, 0.05);
+            border: 1px solid rgba(0, 255, 136, 0.15);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .global-section h3 {
+            font-size: 0.75rem;
+            color: #00ff88;
+            margin-bottom: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        
+        .global-section p {
+            font-size: 0.7rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+        
+        #global-prompt {
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            color: #ccc;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            padding: 0.5rem;
+            resize: vertical;
+            min-height: 60px;
+            outline: none;
+        }
+        
+        #global-prompt:focus { border-color: #00ff88; }
+        #global-prompt::placeholder { color: #444; }
+        
         .agent-card {
             background: rgba(255,255,255,0.03);
             border: 1px solid rgba(255,255,255,0.08);
@@ -283,6 +325,22 @@ HTML = """
         }
         
         .agent-prompt-input:focus { border-color: #00d9ff; }
+        
+        .agent-description-input {
+            width: 100%;
+            background: rgba(0,0,0,0.15);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 4px;
+            color: #aaa;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.75rem;
+            padding: 0.4rem 0.5rem;
+            margin-bottom: 0.5rem;
+            outline: none;
+        }
+        
+        .agent-description-input:focus { border-color: #00d9ff; }
+        .agent-description-input::placeholder { color: #555; }
         
         .agent-delete {
             background: none;
@@ -532,15 +590,21 @@ HTML = """
     
     <div class="agents-panel" id="agents-panel">
         <h2>Agents</h2>
+        <div class="global-section">
+            <h3>Global Instructions</h3>
+            <p>Shared context given to all agents (topic, rules, scenario setup)</p>
+            <textarea id="global-prompt" placeholder="e.g., 'Keep responses under 150 words. The topic is quantum physics.'"></textarea>
+        </div>
         <div id="agents-list"></div>
         <button class="add-agent-btn" id="add-agent-btn">+ Add Agent</button>
         <div class="new-agent-form" id="new-agent-form">
             <input type="text" id="new-agent-name" placeholder="Agent name..." />
+            <input type="text" id="new-agent-description" placeholder="Brief description (shown to other agents)..." />
             <select id="new-agent-model">
-                <option value="gpt-5">gpt-5 (best)</option>
-                <option value="gpt-5-mini">gpt-5-mini</option>
-                <option value="gpt-4o">gpt-4o</option>
+                <option value="gpt-4o">gpt-4o (best)</option>
                 <option value="gpt-4o-mini">gpt-4o-mini (fast/cheap)</option>
+                <option value="gpt-4-turbo">gpt-4-turbo</option>
+                <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
             </select>
             <div class="prompt-row">
                 <textarea id="new-agent-prompt" placeholder="System prompt (brief is fine, click Enrich to expand)..."></textarea>
@@ -611,13 +675,16 @@ HTML = """
         const confirmNewAgent = document.getElementById('confirm-new-agent');
         const enrichNewPrompt = document.getElementById('enrich-new-prompt');
         const newAgentModel = document.getElementById('new-agent-model');
+        const newAgentDescription = document.getElementById('new-agent-description');
+        const globalPromptInput = document.getElementById('global-prompt');
         
-        const MODEL_OPTIONS = ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini'];
+        const MODEL_OPTIONS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'];
         
         let messageCount = 0;
         let isPaused = false;
         let totalTokens = 0;
         let agents = [];
+        let globalPrompt = '';
         
         // Agents panel toggle
         agentsToggle.onclick = () => agentsPanel.classList.toggle('open');
@@ -636,13 +703,14 @@ HTML = """
                         <select class="agent-model-select" data-idx="${idx}" data-field="model">${modelOptions}</select>
                         <button class="agent-delete" data-idx="${idx}">&times;</button>
                     </div>
+                    <input type="text" class="agent-description-input" value="${escapeHtml(agent.description || '')}" data-idx="${idx}" data-field="description" placeholder="Brief description (shown to others)..." />
                     <textarea class="agent-prompt-input" data-idx="${idx}" data-field="prompt" rows="3">${escapeHtml(agent.prompt)}</textarea>
                 `;
                 agentsList.appendChild(card);
             });
             
             // Bind events
-            document.querySelectorAll('.agent-name-input, .agent-prompt-input, .agent-model-select').forEach(input => {
+            document.querySelectorAll('.agent-name-input, .agent-prompt-input, .agent-model-select, .agent-description-input').forEach(input => {
                 input.oninput = onAgentChange;
                 input.onchange = onAgentChange;
             });
@@ -684,6 +752,7 @@ HTML = """
         
         addAgentBtn.onclick = () => {
             newAgentName.value = '';
+            newAgentDescription.value = '';
             newAgentPrompt.value = '';
             newAgentModel.value = 'gpt-4o';
             newAgentForm.classList.add('visible');
@@ -698,6 +767,7 @@ HTML = """
         
         confirmNewAgent.onclick = () => {
             const name = newAgentName.value.trim();
+            const description = newAgentDescription.value.trim();
             const prompt = newAgentPrompt.value.trim();
             const model = newAgentModel.value;
             
@@ -706,7 +776,7 @@ HTML = """
                 return;
             }
             
-            agents.push({ name, prompt: prompt || 'You are a helpful assistant.', model });
+            agents.push({ name, description, prompt: prompt || 'You are a helpful assistant.', model });
             renderAgents();
             saveAgents();
             
@@ -804,6 +874,8 @@ HTML = """
                 pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
                 pauseBtn.classList.toggle('paused', isPaused);
                 agents = settings.agents || [];
+                globalPrompt = settings.global_prompt || '';
+                globalPromptInput.value = globalPrompt;
                 renderAgents();
                 updateStatus();
             } catch (e) {
@@ -819,6 +891,26 @@ HTML = """
         
         maxTokensInput.oninput = onSettingsChange;
         delayInput.oninput = onSettingsChange;
+        
+        // Global prompt handler
+        let globalPromptTimeout;
+        globalPromptInput.oninput = () => {
+            globalPrompt = globalPromptInput.value;
+            clearTimeout(globalPromptTimeout);
+            globalPromptTimeout = setTimeout(saveGlobalPrompt, 500);
+        };
+        
+        async function saveGlobalPrompt() {
+            try {
+                await fetch('/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ global_prompt: globalPrompt })
+                });
+            } catch (e) {
+                console.error('Failed to save global prompt:', e);
+            }
+        }
         
         async function sendMessage() {
             const text = userInput.value.trim();
@@ -1064,6 +1156,8 @@ def update_settings():
         settings['delay_seconds'] = max(0, min(300, int(data['delay_seconds'])))
     if 'paused' in data:
         settings['paused'] = bool(data['paused'])
+    if 'global_prompt' in data:
+        settings['global_prompt'] = str(data['global_prompt'])
     
     save_settings(settings)
     return jsonify({'ok': True})
