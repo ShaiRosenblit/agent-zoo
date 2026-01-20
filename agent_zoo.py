@@ -30,8 +30,46 @@ DEFAULT_SETTINGS = {
     "delay_seconds": 5,
     "paused": False,
     "global_prompt": "",
-    "agents": []
+    "agents": [],
+    "default_reasoning_effort": "medium"
 }
+
+
+# --- Model Capabilities ---
+
+MODEL_CAPABILITIES = {
+    # GPT-4 series - standard behavior (system role, supports temperature)
+    "gpt-4o": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
+    "gpt-4o-mini": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
+    "gpt-4.1": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
+    "gpt-4.1-mini": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
+    "gpt-4.1-nano": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
+    "gpt-4-turbo": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
+    "gpt-3.5-turbo": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
+    
+    # o-series reasoning models - developer role, no temperature, supports reasoning_effort
+    "o1": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
+    "o1-mini": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": False},
+    "o3": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
+    "o3-mini": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
+    "o4-mini": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
+    
+    # GPT-5 series - developer role with reasoning
+    "gpt-5.2": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
+}
+
+
+def get_model_capabilities(model: str) -> dict:
+    """Get capabilities for a model, with fallback detection for unknown models."""
+    if model in MODEL_CAPABILITIES:
+        return MODEL_CAPABILITIES[model]
+    # Fallback: detect by prefix for unknown model versions
+    if model.startswith(("o1", "o3", "o4")):
+        return {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True}
+    if model.startswith("gpt-5"):
+        return {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True}
+    # Default to GPT-4 style for unknown models
+    return {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False}
 
 
 # --- Settings ---
@@ -139,8 +177,18 @@ def build_global_context(agents: list[dict], current_agent_name: str, user_instr
 
 # --- Agent ---
 
-def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, model: str, client: OpenAI, global_context: str = "") -> str:
-    """Generate a response for an agent."""
+def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, 
+               model: str, client: OpenAI, global_context: str = "",
+               reasoning_effort: str | None = None) -> str:
+    """Generate a response for an agent.
+    
+    Automatically handles API differences between model families:
+    - GPT-4 series: uses 'system' role
+    - o-series/GPT-5: uses 'developer' role, supports reasoning_effort
+    """
+    capabilities = get_model_capabilities(model)
+    instruction_role = capabilities["role"]
+    
     # Combine global context with agent's personal prompt
     if global_context:
         full_prompt = f"{global_context}\n\n---\n\nYour personal instructions:\n{prompt}"
@@ -148,7 +196,7 @@ def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, mo
         full_prompt = prompt
     
     messages = [
-        {"role": "system", "content": full_prompt},
+        {"role": instruction_role, "content": full_prompt},
         {
             "role": "user",
             "content": (
@@ -159,11 +207,18 @@ def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, mo
         },
     ]
     
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_completion_tokens=max_tokens,
-    )
+    # Build kwargs based on model capabilities
+    kwargs = {
+        "model": model,
+        "messages": messages,
+        "max_completion_tokens": max_tokens,
+    }
+    
+    # Add reasoning_effort for models that support it
+    if capabilities["supports_reasoning_effort"] and reasoning_effort:
+        kwargs["reasoning_effort"] = reasoning_effort
+    
+    response = client.chat.completions.create(**kwargs)
 
     content = response.choices[0].message.content
     return content.strip() if content else "(no response)"
@@ -326,7 +381,8 @@ def main():
         # Generate response
         max_tokens = settings.get("max_tokens", 512)
         model = agent.get("model", "gpt-4o")
-        response = call_agent(agent["name"], agent["prompt"], channel_content, max_tokens, model, client, global_context)
+        reasoning_effort = agent.get("reasoning_effort", settings.get("default_reasoning_effort"))
+        response = call_agent(agent["name"], agent["prompt"], channel_content, max_tokens, model, client, global_context, reasoning_effort)
 
         # Check stop again before writing
         if should_stop():

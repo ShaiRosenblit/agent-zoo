@@ -1,0 +1,43 @@
+---
+description: Run tests automatically after code changes
+globs:
+  - "**/*.py"
+  - "!tests/**"
+---
+
+# Testing Rules
+
+After making changes to Python source files (`agent_zoo.py` or `server.py`), run the test suite to verify the changes don't break existing functionality:
+
+```bash
+uv run pytest tests/ -v --tb=short
+```
+
+## When to Run Tests
+
+- After modifying any function in `agent_zoo.py` or `server.py`
+- After adding new features or fixing bugs
+- Before completing a task that involved code changes
+
+## Test Commands
+
+```bash
+# Quick test run (default)
+uv run pytest
+
+# Verbose output with short tracebacks
+uv run pytest -v --tb=short
+
+# Run specific test file
+uv run pytest tests/test_agent_zoo.py -v
+
+# Run integration tests (requires OPENAI_API_KEY)
+uv run pytest -m integration
+```
+
+## If Tests Fail
+
+1. Read the error message carefully
+2. Fix the issue in the source code
+3. Re-run tests to confirm the fix
+4. Do not consider the task complete until all tests pass

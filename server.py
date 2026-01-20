@@ -310,6 +310,22 @@ HTML = """
         
         .agent-model-select:focus { border-color: #00d9ff; }
         
+        .agent-reasoning-select {
+            background: rgba(255, 200, 0, 0.1);
+            border: 1px solid rgba(255, 200, 0, 0.2);
+            border-radius: 4px;
+            color: #ffd700;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            padding: 0.15rem 0.25rem;
+            outline: none;
+            cursor: pointer;
+            margin-left: 0.25rem;
+        }
+        
+        .agent-reasoning-select:focus { border-color: #ffd700; }
+        .agent-reasoning-select.hidden { display: none; }
+        
         .agent-prompt-input {
             width: 100%;
             background: rgba(0,0,0,0.2);
@@ -585,10 +601,32 @@ HTML = """
         <div class="new-agent-form" id="new-agent-form">
             <input type="text" id="new-agent-name" placeholder="Agent name..." />
             <select id="new-agent-model">
-                <option value="gpt-4o">gpt-4o (best)</option>
-                <option value="gpt-4o-mini">gpt-4o-mini (fast/cheap)</option>
-                <option value="gpt-4-turbo">gpt-4-turbo</option>
-                <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                <optgroup label="GPT-4 Series">
+                    <option value="gpt-4o">gpt-4o (recommended)</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini (fast/cheap)</option>
+                    <option value="gpt-4.1">gpt-4.1</option>
+                    <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+                    <option value="gpt-4.1-nano">gpt-4.1-nano (fastest)</option>
+                </optgroup>
+                <optgroup label="Reasoning Models (o-series)">
+                    <option value="o1">o1 (advanced reasoning)</option>
+                    <option value="o1-mini">o1-mini</option>
+                    <option value="o3">o3</option>
+                    <option value="o3-mini">o3-mini</option>
+                    <option value="o4-mini">o4-mini</option>
+                </optgroup>
+                <optgroup label="GPT-5 Series">
+                    <option value="gpt-5.2">gpt-5.2 (latest)</option>
+                </optgroup>
+                <optgroup label="Legacy">
+                    <option value="gpt-4-turbo">gpt-4-turbo</option>
+                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                </optgroup>
+            </select>
+            <select id="new-agent-reasoning" class="hidden" title="Reasoning effort (for o-series/GPT-5 models)">
+                <option value="low">low reasoning</option>
+                <option value="medium" selected>medium reasoning</option>
+                <option value="high">high reasoning</option>
             </select>
             <div class="prompt-row">
                 <textarea id="new-agent-prompt" placeholder="System prompt (brief is fine, click Enrich to expand)..."></textarea>
@@ -659,9 +697,28 @@ HTML = """
         const confirmNewAgent = document.getElementById('confirm-new-agent');
         const enrichNewPrompt = document.getElementById('enrich-new-prompt');
         const newAgentModel = document.getElementById('new-agent-model');
+        const newAgentReasoning = document.getElementById('new-agent-reasoning');
         const globalPromptInput = document.getElementById('global-prompt');
         
-        const MODEL_OPTIONS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'];
+        const MODEL_OPTIONS = [
+            // GPT-4 series
+            'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
+            // o-series reasoning models
+            'o1', 'o1-mini', 'o3', 'o3-mini', 'o4-mini',
+            // GPT-5 series
+            'gpt-5.2',
+            // Legacy
+            'gpt-4-turbo', 'gpt-3.5-turbo'
+        ];
+        
+        const REASONING_EFFORT_OPTIONS = ['low', 'medium', 'high'];
+        
+        // Models that support reasoning_effort parameter
+        const REASONING_MODELS = ['o1', 'o3', 'o3-mini', 'o4-mini', 'gpt-5.2'];
+        
+        function supportsReasoningEffort(model) {
+            return REASONING_MODELS.some(m => model && model.startsWith(m));
+        }
         
         let messageCount = 0;
         let isPaused = false;
@@ -680,10 +737,15 @@ HTML = """
                 const modelOptions = MODEL_OPTIONS.map(m => 
                     `<option value="${m}" ${(agent.model || 'gpt-4o') === m ? 'selected' : ''}>${m}</option>`
                 ).join('');
+                const reasoningOptions = REASONING_EFFORT_OPTIONS.map(r =>
+                    `<option value="${r}" ${(agent.reasoning_effort || 'medium') === r ? 'selected' : ''}>${r}</option>`
+                ).join('');
+                const showReasoning = supportsReasoningEffort(agent.model || 'gpt-4o');
                 card.innerHTML = `
                     <div class="agent-card-header">
                         <input type="text" class="agent-name-input" value="${escapeHtml(agent.name)}" data-idx="${idx}" data-field="name" />
                         <select class="agent-model-select" data-idx="${idx}" data-field="model">${modelOptions}</select>
+                        <select class="agent-reasoning-select ${showReasoning ? '' : 'hidden'}" data-idx="${idx}" data-field="reasoning_effort" title="Reasoning effort">${reasoningOptions}</select>
                         <button class="agent-delete" data-idx="${idx}">&times;</button>
                     </div>
                     <textarea class="agent-prompt-input" data-idx="${idx}" data-field="prompt" rows="3">${escapeHtml(agent.prompt)}</textarea>
@@ -692,9 +754,20 @@ HTML = """
             });
             
             // Bind events
-            document.querySelectorAll('.agent-name-input, .agent-prompt-input, .agent-model-select').forEach(input => {
+            document.querySelectorAll('.agent-name-input, .agent-prompt-input, .agent-model-select, .agent-reasoning-select').forEach(input => {
                 input.oninput = onAgentChange;
                 input.onchange = onAgentChange;
+            });
+            // Special handler for model select to show/hide reasoning effort
+            document.querySelectorAll('.agent-model-select').forEach(select => {
+                select.onchange = (e) => {
+                    onAgentChange(e);
+                    const idx = parseInt(e.target.dataset.idx);
+                    const reasoningSelect = document.querySelector(`.agent-reasoning-select[data-idx="${idx}"]`);
+                    if (reasoningSelect) {
+                        reasoningSelect.classList.toggle('hidden', !supportsReasoningEffort(e.target.value));
+                    }
+                };
             });
             document.querySelectorAll('.agent-delete').forEach(btn => {
                 btn.onclick = () => deleteAgent(parseInt(btn.dataset.idx));
@@ -736,9 +809,16 @@ HTML = """
             newAgentName.value = '';
             newAgentPrompt.value = '';
             newAgentModel.value = 'gpt-4o';
+            newAgentReasoning.value = 'medium';
+            newAgentReasoning.classList.add('hidden');
             newAgentForm.classList.add('visible');
             addAgentBtn.style.display = 'none';
             newAgentName.focus();
+        };
+        
+        // Show/hide reasoning effort based on model selection in new agent form
+        newAgentModel.onchange = () => {
+            newAgentReasoning.classList.toggle('hidden', !supportsReasoningEffort(newAgentModel.value));
         };
         
         cancelNewAgent.onclick = () => {
@@ -750,13 +830,19 @@ HTML = """
             const name = newAgentName.value.trim();
             const prompt = newAgentPrompt.value.trim();
             const model = newAgentModel.value;
+            const reasoning_effort = newAgentReasoning.value;
             
             if (!name) {
                 newAgentName.focus();
                 return;
             }
             
-            agents.push({ name, prompt: prompt || 'You are a helpful assistant.', model });
+            const newAgent = { name, prompt: prompt || 'You are a helpful assistant.', model };
+            // Only include reasoning_effort for models that support it
+            if (supportsReasoningEffort(model)) {
+                newAgent.reasoning_effort = reasoning_effort;
+            }
+            agents.push(newAgent);
             renderAgents();
             saveAgents();
             
