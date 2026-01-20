@@ -92,7 +92,7 @@ def get_last_author(path: str) -> str | None:
 
 # --- Agent ---
 
-def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, client: OpenAI) -> str:
+def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, model: str, client: OpenAI) -> str:
     """Generate a response for an agent."""
     messages = [
         {"role": "system", "content": prompt},
@@ -105,14 +105,15 @@ def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int, cl
             ),
         },
     ]
-
+    
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=model,
         messages=messages,
         max_tokens=max_tokens,
     )
 
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    return content.strip() if content else "(no response)"
 
 
 # --- Main ---
@@ -251,7 +252,8 @@ def main():
 
         # Generate response
         max_tokens = settings.get("max_tokens", 512)
-        response = call_agent(agent["name"], agent["prompt"], channel_content, max_tokens, client)
+        model = agent.get("model", "gpt-4o")
+        response = call_agent(agent["name"], agent["prompt"], channel_content, max_tokens, model, client)
 
         # Check stop again before writing
         if should_stop():

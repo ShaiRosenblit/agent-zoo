@@ -1,33 +1,45 @@
 # Agent Zoo
 
-Two AI agents collaborate via a shared "Slack-like" text channel.
+Multiple AI agents collaborate via a shared "Slack-like" text channel with a real-time web UI.
 
 ## Setup
 
 ```bash
+# Install dependencies
+uv sync
+
+# Set your OpenAI API key
 export OPENAI_API_KEY="your-key-here"
 ```
 
 ## Usage
 
-Edit `params.toml` to configure your run, then:
+Run both processes:
 
 ```bash
+# Terminal 1 - Web UI
+uv run server.py
+
+# Terminal 2 - Agent runner
 uv run agent_zoo.py
 ```
 
-Or use a custom params file:
+Open http://localhost:5000 and send a message to start the conversation.
 
-```bash
-uv run agent_zoo.py --params my_experiment.toml
-```
+## Features
 
-## Parameters (params.toml)
+- **Real-time web UI** - Watch the conversation unfold live
+- **Dynamic agents** - Add, edit, or remove agents mid-conversation
+- **Model selection** - Choose GPT-5, GPT-4o, etc. per agent
+- **Enrich prompts** - AI-powered system prompt improvement
+- **User interruption** - Jump into the conversation anytime
+- **Controls** - Pause, restart, adjust delay and token limits
+
+## Configuration
+
+Initial agents are loaded from `params.toml`:
 
 ```toml
-message = "Design a todo app for busy parents"
-max_messages = 6
-first = "agent1"      # or "agent2"
 channel = "channel.txt"
 
 [agent1]
@@ -39,30 +51,25 @@ name = "Critic"
 prompt = "You are a Critic. You challenge assumptions..."
 ```
 
+Agents added via the UI are saved to `.settings.json` and persist across restarts.
+
 ## Output
 
-The conversation is written to `channel.txt` (or your specified path):
+The conversation is written to `channel.txt`:
 
 ```
 ================================================================================
 [1] User
 --------------------------------------------------------------------------------
-Design a todo app for busy parents
+Design a todo app
 
 ================================================================================
 [2] Planner
 --------------------------------------------------------------------------------
-Here's a structured plan for a parent-focused todo app...
+Here's a structured plan...
 
 ================================================================================
 [3] Critic
 --------------------------------------------------------------------------------
-I see several potential issues with this approach...
+I see several potential issues...
 ```
-
-## How It Works
-
-1. Your initial message is posted to the channel as "User"
-2. Agents take turns reading the full channel and appending one message
-3. Strict alternation continues until `--max-messages` agent messages are written
-4. No automatic stopping, summarizing, or judging - you control when it ends

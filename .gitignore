@@ -1,0 +1,17 @@
+# Runtime files
+channel.txt
+.settings.json
+.stop
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+

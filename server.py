@@ -247,12 +247,26 @@ HTML = """
             font-family: 'Space Grotesk', sans-serif;
             font-size: 1rem;
             font-weight: 600;
-            width: 200px;
+            width: 140px;
             outline: none;
             border-bottom: 1px solid transparent;
         }
         
         .agent-name-input:focus { border-bottom-color: #00d9ff; }
+        
+        .agent-model-select {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            color: #888;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            padding: 0.2rem 0.3rem;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .agent-model-select:focus { border-color: #00d9ff; }
         
         .agent-prompt-input {
             width: 100%;
@@ -325,6 +339,22 @@ HTML = """
         }
         
         .new-agent-form input:focus { border-color: #00d9ff; }
+        
+        .new-agent-form select {
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .new-agent-form select:focus { border-color: #00d9ff; }
         
         .new-agent-form textarea {
             background: rgba(0,0,0,0.3);
@@ -506,6 +536,12 @@ HTML = """
         <button class="add-agent-btn" id="add-agent-btn">+ Add Agent</button>
         <div class="new-agent-form" id="new-agent-form">
             <input type="text" id="new-agent-name" placeholder="Agent name..." />
+            <select id="new-agent-model">
+                <option value="gpt-5">gpt-5 (best)</option>
+                <option value="gpt-5-mini">gpt-5-mini</option>
+                <option value="gpt-4o">gpt-4o</option>
+                <option value="gpt-4o-mini">gpt-4o-mini (fast/cheap)</option>
+            </select>
             <div class="prompt-row">
                 <textarea id="new-agent-prompt" placeholder="System prompt (brief is fine, click Enrich to expand)..."></textarea>
                 <button class="enrich-btn" id="enrich-new-prompt">Enrich</button>
@@ -574,6 +610,9 @@ HTML = """
         const cancelNewAgent = document.getElementById('cancel-new-agent');
         const confirmNewAgent = document.getElementById('confirm-new-agent');
         const enrichNewPrompt = document.getElementById('enrich-new-prompt');
+        const newAgentModel = document.getElementById('new-agent-model');
+        
+        const MODEL_OPTIONS = ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini'];
         
         let messageCount = 0;
         let isPaused = false;
@@ -588,9 +627,13 @@ HTML = """
             agents.forEach((agent, idx) => {
                 const card = document.createElement('div');
                 card.className = 'agent-card';
+                const modelOptions = MODEL_OPTIONS.map(m => 
+                    `<option value="${m}" ${(agent.model || 'gpt-4o') === m ? 'selected' : ''}>${m}</option>`
+                ).join('');
                 card.innerHTML = `
                     <div class="agent-card-header">
                         <input type="text" class="agent-name-input" value="${escapeHtml(agent.name)}" data-idx="${idx}" data-field="name" />
+                        <select class="agent-model-select" data-idx="${idx}" data-field="model">${modelOptions}</select>
                         <button class="agent-delete" data-idx="${idx}">&times;</button>
                     </div>
                     <textarea class="agent-prompt-input" data-idx="${idx}" data-field="prompt" rows="3">${escapeHtml(agent.prompt)}</textarea>
@@ -599,8 +642,9 @@ HTML = """
             });
             
             // Bind events
-            document.querySelectorAll('.agent-name-input, .agent-prompt-input').forEach(input => {
+            document.querySelectorAll('.agent-name-input, .agent-prompt-input, .agent-model-select').forEach(input => {
                 input.oninput = onAgentChange;
+                input.onchange = onAgentChange;
             });
             document.querySelectorAll('.agent-delete').forEach(btn => {
                 btn.onclick = () => deleteAgent(parseInt(btn.dataset.idx));
@@ -641,6 +685,7 @@ HTML = """
         addAgentBtn.onclick = () => {
             newAgentName.value = '';
             newAgentPrompt.value = '';
+            newAgentModel.value = 'gpt-4o';
             newAgentForm.classList.add('visible');
             addAgentBtn.style.display = 'none';
             newAgentName.focus();
@@ -654,13 +699,14 @@ HTML = """
         confirmNewAgent.onclick = () => {
             const name = newAgentName.value.trim();
             const prompt = newAgentPrompt.value.trim();
+            const model = newAgentModel.value;
             
             if (!name) {
                 newAgentName.focus();
                 return;
             }
             
-            agents.push({ name, prompt: prompt || 'You are a helpful assistant.' });
+            agents.push({ name, prompt: prompt || 'You are a helpful assistant.', model });
             renderAgents();
             saveAgents();
             
