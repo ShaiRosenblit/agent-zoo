@@ -1161,6 +1161,7 @@ Return ONLY the improved prompt text, no explanations."""
 
 
 if __name__ == '__main__':
+    # For standalone use (not typical - prefer running agent_zoo.py)
     print("Starting server at http://localhost:5000")
-    print("Run 'uv run agent_zoo.py' in another terminal to start a conversation")
+    print("Note: Run 'uv run agent_zoo.py' instead to start both server and agents")
     app.run(debug=False, threaded=True)

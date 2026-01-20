@@ -14,13 +14,7 @@ export OPENAI_API_KEY="your-key-here"
 
 ## Usage
 
-Run both processes:
-
 ```bash
-# Terminal 1 - Web UI
-uv run server.py
-
-# Terminal 2 - Agent runner
 uv run agent_zoo.py
 ```
 

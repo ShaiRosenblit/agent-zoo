@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import re
+import threading
 import time
 import tomllib
 from openai import OpenAI
@@ -135,6 +136,18 @@ def clear_stop():
         os.remove(STOP_FILE)
 
 
+def start_server():
+    """Start the Flask web server in a background thread."""
+    from server import app
+    import logging
+    
+    # Suppress Flask logs
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    
+    app.run(debug=False, threaded=True, use_reloader=False)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run a multi-agent conversation via a shared channel."
@@ -182,8 +195,12 @@ def main():
     if os.path.exists(channel_path):
         os.remove(channel_path)
 
-    print("Waiting for first message from UI...")
-    print("Open http://localhost:5000 and send a message to start.\n")
+    # Start web server in background thread
+    server_thread = threading.Thread(target=start_server, daemon=True)
+    server_thread.start()
+    
+    print("Agent Zoo running at http://localhost:5000")
+    print("Send a message in the UI to start the conversation.\n")
 
     # Wait for first message
     while not should_stop():
