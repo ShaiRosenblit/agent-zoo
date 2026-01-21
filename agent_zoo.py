@@ -136,8 +136,21 @@ def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int,
     
     response = client.chat.completions.create(**kwargs)
 
-    content = response.choices[0].message.content
-    return content.strip() if content else "(no response)"
+    choice = response.choices[0]
+    message = choice.message
+    
+    # Extract content - reasoning models may have content in different places
+    content = message.content
+    
+    # Handle empty content from API
+    if not content:
+        # Check for refusal
+        refusal = getattr(message, 'refusal', None)
+        if refusal and isinstance(refusal, str):
+            return f"[Refused: {refusal}]"
+        return "(no response)"
+    
+    return content.strip()
 
 
 # --- Params Loading ---
@@ -343,8 +356,10 @@ def run_conversation_loop(channel_path: str, client: OpenAI):
             update_agent_state(agent["name"], "idle")
             continue
         
-        # Handle [PASS] response
-        if response and response.strip() == "[PASS]":
+        # Handle [PASS] response (also treat "(no response)" as a pass - model sometimes ignores [PASS] instruction)
+        response_stripped = response.strip() if response else ""
+        is_pass = response_stripped in ("[PASS]", "(no response)", "")
+        if is_pass:
             update_agent_state(agent["name"], "passed")
             print(f"    {agent['name']}: [passed]")
             current_turn = (current_turn + 1) % len(agents)
