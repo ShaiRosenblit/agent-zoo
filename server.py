@@ -224,7 +224,6 @@ HTML = """
         }
         
         .status-dot.paused { background: var(--warning); animation: none; }
-        .status-dot.stopped { background: var(--danger); animation: none; }
         
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(8px); }
@@ -691,13 +690,6 @@ HTML = """
         #pause-btn:hover { background: rgba(245, 158, 11, 0.1); }
         #pause-btn.paused { background: var(--warning); color: white; }
         
-        #stop-btn {
-            background: var(--surface-0);
-            color: var(--danger);
-            border: 1px solid var(--danger);
-        }
-        
-        #stop-btn:hover { background: rgba(239, 68, 68, 0.1); }
         
         #restart-btn {
             background: var(--surface-0);
@@ -861,7 +853,6 @@ HTML = """
                 </div>
                 <button id="pause-btn">Pause</button>
                 <button id="restart-btn">Restart</button>
-                <button id="stop-btn">Stop</button>
             </div>
             <div class="input-row">
                 <textarea id="user-input" placeholder="Type a message... (Shift+Enter for new line)" rows="1"></textarea>
@@ -879,7 +870,6 @@ HTML = """
         const sendBtn = document.getElementById('send-btn');
         const pauseBtn = document.getElementById('pause-btn');
         const restartBtn = document.getElementById('restart-btn');
-        const stopBtn = document.getElementById('stop-btn');
         const maxTokensInput = document.getElementById('max-tokens');
         const delayInput = document.getElementById('delay-seconds');
         const agentsToggle = document.getElementById('agents-toggle');
@@ -1303,15 +1293,6 @@ HTML = """
             }
         };
         
-        stopBtn.onclick = async () => {
-            try {
-                await fetch('/stop', { method: 'POST' });
-                statusDot.className = 'status-dot stopped';
-                statusText.textContent = 'Stopped';
-            } catch (e) {
-                console.error('Failed to stop:', e);
-            }
-        };
         
         const source = new EventSource('/stream');
         
