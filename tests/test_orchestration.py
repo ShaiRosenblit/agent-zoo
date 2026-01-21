@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch, call
 import argparse
 
 import agent_zoo
+import shared
 
 
 class TestTurnManagement:
@@ -34,11 +35,11 @@ class TestTurnManagement:
         channel_file = tmp_path / "channel.txt"
         
         # Simulate: Agent1 posts, Agent2 posts, then User posts
-        agent_zoo.append_message(str(channel_file), 1, "Agent1", "Hello")
-        agent_zoo.append_message(str(channel_file), 2, "Agent2", "Hi there")
-        agent_zoo.append_message(str(channel_file), 3, "User", "Hello everyone!")
+        shared.append_message(str(channel_file), 1, "Agent1", "Hello")
+        shared.append_message(str(channel_file), 2, "Agent2", "Hi there")
+        shared.append_message(str(channel_file), 3, "User", "Hello everyone!")
         
-        last_author = agent_zoo.get_last_author(str(channel_file))
+        last_author = shared.get_last_author(str(channel_file))
         
         # When User posts, turn should reset to first agent (turn 0)
         assert last_author == "User"
@@ -52,10 +53,10 @@ class TestTurnManagement:
         ]
         
         channel_file = tmp_path / "channel.txt"
-        agent_zoo.append_message(str(channel_file), 1, "User", "Hello")
-        agent_zoo.append_message(str(channel_file), 2, "Einstein", "Hello back")
+        shared.append_message(str(channel_file), 1, "User", "Hello")
+        shared.append_message(str(channel_file), 2, "Einstein", "Hello back")
         
-        last_author = agent_zoo.get_last_author(str(channel_file))
+        last_author = shared.get_last_author(str(channel_file))
         
         # Find which agent posted and calculate next turn
         current_turn = 0
@@ -94,36 +95,36 @@ class TestPauseResume:
     def test_paused_state_in_settings(self, tmp_path, monkeypatch):
         """Paused state is stored in settings."""
         settings_file = tmp_path / ".settings.json"
-        monkeypatch.setattr(agent_zoo, "SETTINGS_FILE", str(settings_file))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(settings_file))
         
         # Save paused state
-        agent_zoo.save_settings({"paused": True})
+        shared.save_settings({"paused": True})
         
         # Load and verify
-        settings = agent_zoo.load_settings()
+        settings = shared.load_settings()
         assert settings["paused"] is True
 
     def test_pause_toggle(self, tmp_path, monkeypatch):
         """Pause can be toggled."""
         settings_file = tmp_path / ".settings.json"
-        monkeypatch.setattr(agent_zoo, "SETTINGS_FILE", str(settings_file))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(settings_file))
         
         # Start unpaused
-        agent_zoo.save_settings({"paused": False})
+        shared.save_settings({"paused": False})
         
         # Toggle to paused
-        settings = agent_zoo.load_settings()
+        settings = shared.load_settings()
         settings["paused"] = True
-        agent_zoo.save_settings(settings)
+        shared.save_settings(settings)
         
-        assert agent_zoo.load_settings()["paused"] is True
+        assert shared.load_settings()["paused"] is True
         
         # Toggle back
-        settings = agent_zoo.load_settings()
+        settings = shared.load_settings()
         settings["paused"] = False
-        agent_zoo.save_settings(settings)
+        shared.save_settings(settings)
         
-        assert agent_zoo.load_settings()["paused"] is False
+        assert shared.load_settings()["paused"] is False
 
 
 class TestRestartDetection:
@@ -134,32 +135,32 @@ class TestRestartDetection:
         channel_file = tmp_path / "channel.txt"
         
         # Add messages
-        agent_zoo.append_message(str(channel_file), 1, "User", "Hello")
-        agent_zoo.append_message(str(channel_file), 2, "Bot", "Hi")
+        shared.append_message(str(channel_file), 1, "User", "Hello")
+        shared.append_message(str(channel_file), 2, "Bot", "Hi")
         
-        assert agent_zoo.count_messages(str(channel_file)) == 2
+        assert shared.count_messages(str(channel_file)) == 2
         
         # Clear channel
         channel_file.unlink()
         
         # Should detect cleared
-        assert agent_zoo.count_messages(str(channel_file)) == 0
+        assert shared.count_messages(str(channel_file)) == 0
 
     def test_reset_state_on_restart(self, tmp_path):
         """State should reset when channel is cleared."""
         channel_file = tmp_path / "channel.txt"
         
         # Add messages
-        agent_zoo.append_message(str(channel_file), 1, "User", "Hello")
+        shared.append_message(str(channel_file), 1, "User", "Hello")
         
-        initial_count = agent_zoo.count_messages(str(channel_file))
+        initial_count = shared.count_messages(str(channel_file))
         assert initial_count == 1
         
         # Clear channel
         channel_file.write_text("")
         
         # Count should be 0
-        assert agent_zoo.count_messages(str(channel_file)) == 0
+        assert shared.count_messages(str(channel_file)) == 0
 
 
 class TestRaceConditions:
@@ -170,17 +171,17 @@ class TestRaceConditions:
         channel_file = tmp_path / "channel.txt"
         
         # Add a message
-        agent_zoo.append_message(str(channel_file), 1, "User", "Hello")
+        shared.append_message(str(channel_file), 1, "User", "Hello")
         
         # First count check
-        count1 = agent_zoo.count_messages(str(channel_file))
+        count1 = shared.count_messages(str(channel_file))
         assert count1 == 1
         
         # Channel cleared (simulating restart)
         channel_file.unlink()
         
         # Second count check should handle missing file
-        count2 = agent_zoo.count_messages(str(channel_file))
+        count2 = shared.count_messages(str(channel_file))
         assert count2 == 0
 
     def test_message_added_during_processing(self, tmp_path):
@@ -188,14 +189,14 @@ class TestRaceConditions:
         channel_file = tmp_path / "channel.txt"
         
         # Start with one message
-        agent_zoo.append_message(str(channel_file), 1, "User", "Hello")
+        shared.append_message(str(channel_file), 1, "User", "Hello")
         last_count = 1
         
         # Simulate message added during processing
-        agent_zoo.append_message(str(channel_file), 2, "Bot", "Hi")
+        shared.append_message(str(channel_file), 2, "Bot", "Hi")
         
         # Detect new message
-        current_count = agent_zoo.count_messages(str(channel_file))
+        current_count = shared.count_messages(str(channel_file))
         assert current_count > last_count
 
 
@@ -224,19 +225,8 @@ prompt = "You are Curie"
         
         params = agent_zoo.load_params(str(params_file))
         
-        # Extract agents using same logic as main()
-        agents = []
-        i = 1
-        while True:
-            key = f"agent{i}"
-            if key in params:
-                agents.append({
-                    "name": params[key]["name"],
-                    "prompt": params[key]["prompt"]
-                })
-                i += 1
-            else:
-                break
+        # Extract agents using load_agents_from_params
+        agents = agent_zoo.load_agents_from_params(params)
         
         assert len(agents) == 3
         assert agents[0]["name"] == "Einstein"
@@ -258,16 +248,7 @@ prompt = "Third"
         # Note: agent2 is missing
         
         params = agent_zoo.load_params(str(params_file))
-        
-        agents = []
-        i = 1
-        while True:
-            key = f"agent{i}"
-            if key in params:
-                agents.append({"name": params[key]["name"]})
-                i += 1
-            else:
-                break
+        agents = agent_zoo.load_agents_from_params(params)
         
         # Should only get agent1, stops at missing agent2
         assert len(agents) == 1
@@ -285,7 +266,7 @@ prompt = "Helper"
 ''')
         
         params = agent_zoo.load_params(str(params_file))
-        channel_path = params.get("channel", agent_zoo.CHANNEL_PATH)
+        channel_path = params.get("channel", shared.CHANNEL_PATH)
         
         assert channel_path == "custom_channel.txt"
 
@@ -299,9 +280,9 @@ prompt = "Helper"
 ''')
         
         params = agent_zoo.load_params(str(params_file))
-        channel_path = params.get("channel", agent_zoo.CHANNEL_PATH)
+        channel_path = params.get("channel", shared.CHANNEL_PATH)
         
-        assert channel_path == agent_zoo.CHANNEL_PATH
+        assert channel_path == shared.CHANNEL_PATH
 
 
 class TestCLIArguments:
@@ -341,11 +322,11 @@ class TestDelayBehavior:
     def test_delay_read_from_settings(self, tmp_path, monkeypatch):
         """Delay is read from settings."""
         settings_file = tmp_path / ".settings.json"
-        monkeypatch.setattr(agent_zoo, "SETTINGS_FILE", str(settings_file))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(settings_file))
         
-        agent_zoo.save_settings({"delay_seconds": 10})
+        shared.save_settings({"delay_seconds": 10})
         
-        settings = agent_zoo.load_settings()
+        settings = shared.load_settings()
         delay = settings.get("delay_seconds", 0)
         
         assert delay == 10
@@ -353,10 +334,10 @@ class TestDelayBehavior:
     def test_default_delay(self, tmp_path, monkeypatch):
         """Default delay is used when not specified."""
         settings_file = tmp_path / ".settings.json"
-        monkeypatch.setattr(agent_zoo, "SETTINGS_FILE", str(settings_file))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(settings_file))
         
         # Empty settings file
-        settings = agent_zoo.load_settings()
+        settings = shared.load_settings()
         delay = settings.get("delay_seconds", 0)
         
         assert delay == 0
@@ -370,26 +351,26 @@ class TestStopSignalDuringExecution:
         stop_file = tmp_path / ".stop"
         channel_file = tmp_path / "channel.txt"
         
-        monkeypatch.setattr(agent_zoo, "STOP_FILE", str(stop_file))
+        monkeypatch.setattr(shared, "STOP_FILE", str(stop_file))
         
         # No stop file initially
-        assert agent_zoo.should_stop() is False
+        assert shared.should_stop() is False
         
         # Create stop file (simulating user clicking stop)
         stop_file.write_text("stop")
         
         # Should detect stop
-        assert agent_zoo.should_stop() is True
+        assert shared.should_stop() is True
 
     def test_stop_file_cleared_on_exit(self, tmp_path, monkeypatch):
         """Stop file is cleared on normal exit."""
         stop_file = tmp_path / ".stop"
         stop_file.write_text("stop")
         
-        monkeypatch.setattr(agent_zoo, "STOP_FILE", str(stop_file))
+        monkeypatch.setattr(shared, "STOP_FILE", str(stop_file))
         
         # Clear stop (as main() does on exit)
-        agent_zoo.clear_stop()
+        shared.clear_stop()
         
         assert not stop_file.exists()
 
@@ -423,10 +404,10 @@ class TestAgentContextIntegration:
         """Agent receives full channel content."""
         channel_file = tmp_path / "channel.txt"
         
-        agent_zoo.append_message(str(channel_file), 1, "User", "Hello")
-        agent_zoo.append_message(str(channel_file), 2, "Bot", "Hi there!")
+        shared.append_message(str(channel_file), 1, "User", "Hello")
+        shared.append_message(str(channel_file), 2, "Bot", "Hi there!")
         
-        content = agent_zoo.read_channel(str(channel_file))
+        content = shared.read_channel(str(channel_file))
         
         assert "Hello" in content
         assert "Hi there!" in content
@@ -442,22 +423,21 @@ class TestMessageIndexing:
         channel_file = tmp_path / "channel.txt"
         
         for i in range(1, 6):
-            agent_zoo.append_message(str(channel_file), i, "Bot", f"Message {i}")
+            shared.append_message(str(channel_file), i, "Bot", f"Message {i}")
         
-        assert agent_zoo.count_messages(str(channel_file)) == 5
+        assert shared.count_messages(str(channel_file)) == 5
 
     def test_index_after_restart(self, tmp_path):
         """Index starts at 1 after restart."""
         channel_file = tmp_path / "channel.txt"
         
         # Add messages
-        agent_zoo.append_message(str(channel_file), 1, "User", "Hello")
-        agent_zoo.append_message(str(channel_file), 2, "Bot", "Hi")
+        shared.append_message(str(channel_file), 1, "User", "Hello")
+        shared.append_message(str(channel_file), 2, "Bot", "Hi")
         
         # Clear (restart)
         channel_file.unlink()
         
         # Next message should be index 1
-        next_index = agent_zoo.count_messages(str(channel_file)) + 1
+        next_index = shared.count_messages(str(channel_file)) + 1
         assert next_index == 1
-

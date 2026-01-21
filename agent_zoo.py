@@ -11,175 +11,22 @@ Conversation starts when user sends the first message from the UI.
 """
 
 import argparse
-import json
 import os
-import re
 import threading
 import time
 import tomllib
 from openai import OpenAI
 
-SEPARATOR = "=" * 80
-SUBSEPARATOR = "-" * 80
-STOP_FILE = ".stop"
-SETTINGS_FILE = ".settings.json"
-CHANNEL_PATH = "channel.txt"
-AGENT_STATE_FILE = ".agent_state.json"
-
-DEFAULT_SETTINGS = {
-    "max_tokens": 512,
-    "delay_seconds": 0,
-    "paused": False,
-    "global_prompt": "",
-    "agents": [],
-    "default_reasoning_effort": "medium"
-}
-
-
-# --- Model Capabilities ---
-
-MODEL_CAPABILITIES = {
-    # GPT-4 series - standard behavior (system role, supports temperature)
-    "gpt-4o": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
-    "gpt-4o-mini": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
-    "gpt-4.1": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
-    "gpt-4.1-mini": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
-    "gpt-4.1-nano": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
-    "gpt-4-turbo": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
-    "gpt-3.5-turbo": {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False},
-    
-    # o-series reasoning models - developer role, no temperature, supports reasoning_effort
-    "o1": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
-    "o1-mini": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": False},
-    "o3": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
-    "o3-mini": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
-    "o4-mini": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
-    
-    # GPT-5 series - developer role with reasoning
-    "gpt-5.2": {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True},
-}
-
-
-def get_model_capabilities(model: str) -> dict:
-    """Get capabilities for a model, with fallback detection for unknown models."""
-    if model in MODEL_CAPABILITIES:
-        return MODEL_CAPABILITIES[model]
-    # Fallback: detect by prefix for unknown model versions
-    if model.startswith(("o1", "o3", "o4")):
-        return {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True}
-    if model.startswith("gpt-5"):
-        return {"role": "developer", "supports_temperature": False, "supports_reasoning_effort": True}
-    # Default to GPT-4 style for unknown models
-    return {"role": "system", "supports_temperature": True, "supports_reasoning_effort": False}
-
-
-# --- Settings ---
-
-def load_settings() -> dict:
-    """Load settings from file, or return defaults."""
-    if os.path.exists(SETTINGS_FILE):
-        try:
-            with open(SETTINGS_FILE, "r") as f:
-                return {**DEFAULT_SETTINGS, **json.load(f)}
-        except Exception:
-            pass
-    return DEFAULT_SETTINGS.copy()
-
-
-def save_settings(settings: dict) -> None:
-    """Save settings to file."""
-    with open(SETTINGS_FILE, "w") as f:
-        json.dump(settings, f, indent=2)
-
-
-# --- Agent State ---
-
-def load_agent_state() -> dict:
-    """Load agent state from file."""
-    if os.path.exists(AGENT_STATE_FILE):
-        try:
-            with open(AGENT_STATE_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {"current_agent": None, "state": "idle", "timestamp": 0, "pass_history": []}
-
-
-def update_agent_state(agent_name: str, state: str) -> None:
-    """Update agent state (thinking, passed, responded, idle)."""
-    current = load_agent_state()
-    current["current_agent"] = agent_name
-    current["state"] = state
-    current["timestamp"] = time.time()
-    
-    # Track passes in history (keep last 10 seconds worth)
-    if state == "passed":
-        current["pass_history"].append({"agent": agent_name, "time": current["timestamp"]})
-    
-    # Clean old pass history (older than 10 seconds)
-    cutoff = time.time() - 10
-    current["pass_history"] = [p for p in current["pass_history"] if p["time"] > cutoff]
-    
-    with open(AGENT_STATE_FILE, "w") as f:
-        json.dump(current, f)
-
-
-def clear_agent_state() -> None:
-    """Clear agent state file."""
-    if os.path.exists(AGENT_STATE_FILE):
-        os.remove(AGENT_STATE_FILE)
-
-
-def all_agents_passed(agent_names: list[str]) -> bool:
-    """Check if all agents have passed in recent history (loop detection)."""
-    state = load_agent_state()
-    pass_history = state.get("pass_history", [])
-    
-    if not pass_history or not agent_names:
-        return False
-    
-    # Check if every agent has passed at least once in recent history
-    passed_agents = {p["agent"] for p in pass_history}
-    return all(name in passed_agents for name in agent_names)
-
-
-# --- Channel Operations ---
-
-def read_channel(path: str) -> str:
-    """Read the entire channel file. Returns empty string if file doesn't exist."""
-    if not os.path.exists(path):
-        return ""
-    with open(path, "r") as f:
-        return f.read()
-
-
-def append_message(path: str, index: int, author: str, content: str) -> None:
-    """Append a message to the channel file."""
-    with open(path, "a") as f:
-        f.write(f"{SEPARATOR}\n")
-        f.write(f"[{index}] {author}\n")
-        f.write(f"{SUBSEPARATOR}\n")
-        f.write(f"{content}\n\n")
-
-
-def count_messages(path: str) -> int:
-    """Count messages in the channel."""
-    content = read_channel(path)
-    if not content.strip():
-        return 0
-    return content.count(SEPARATOR)
-
-
-def get_last_author(path: str) -> str | None:
-    """Get the author of the last message."""
-    content = read_channel(path)
-    if not content.strip():
-        return None
-    
-    matches = list(re.finditer(r'\[(\d+)\]\s+(.+)', content))
-    if matches:
-        return matches[-1].group(2).strip()
-    return None
+from shared import (
+    # Constants
+    CHANNEL_PATH,
+    # Functions
+    get_model_capabilities,
+    load_settings, save_settings,
+    update_agent_state, clear_agent_state, all_agents_passed,
+    read_channel, append_message, count_messages, get_last_author,
+    should_stop, clear_stop,
+)
 
 
 # --- Global Context ---
@@ -293,7 +140,7 @@ def call_agent(name: str, prompt: str, channel_content: str, max_tokens: int,
     return content.strip() if content else "(no response)"
 
 
-# --- Main ---
+# --- Params Loading ---
 
 def load_params(path: str) -> dict:
     """Load parameters from a TOML file."""
@@ -301,16 +148,24 @@ def load_params(path: str) -> dict:
         return tomllib.load(f)
 
 
-def should_stop() -> bool:
-    """Check if stop signal exists."""
-    return os.path.exists(STOP_FILE)
+def load_agents_from_params(params: dict) -> list[dict]:
+    """Extract agents list from params dict."""
+    agents = []
+    i = 1
+    while True:
+        key = f"agent{i}"
+        if key in params:
+            agents.append({
+                "name": params[key]["name"],
+                "prompt": params[key]["prompt"]
+            })
+            i += 1
+        else:
+            break
+    return agents
 
 
-def clear_stop():
-    """Clear the stop signal."""
-    if os.path.exists(STOP_FILE):
-        os.remove(STOP_FILE)
-
+# --- Server ---
 
 def start_server():
     """Start the Flask web server in a background thread."""
@@ -324,6 +179,201 @@ def start_server():
     app.run(debug=False, threaded=True, use_reloader=False)
 
 
+# --- Main Loop Components ---
+
+def initialize_session(args) -> tuple[dict, str, OpenAI]:
+    """Initialize a new session: load params, setup files, start server."""
+    params = load_params(args.params)
+    channel_path = params.get("channel", CHANNEL_PATH)
+    initial_agents = load_agents_from_params(params)
+    
+    client = OpenAI()
+    
+    # Clear stop file, agent state
+    clear_stop()
+    clear_agent_state()
+    
+    # Load existing settings or use params.toml agents
+    existing_settings = load_settings()
+    if not existing_settings.get("agents"):
+        existing_settings["agents"] = initial_agents
+        save_settings(existing_settings)
+    
+    # Clear channel file
+    if os.path.exists(channel_path):
+        os.remove(channel_path)
+    
+    # Start web server
+    server_thread = threading.Thread(target=start_server, daemon=True)
+    server_thread.start()
+    
+    print("Agent Zoo running at http://localhost:5000")
+    print("Send a message in the UI to start the conversation.\n")
+    
+    return params, channel_path, client
+
+
+def wait_for_first_message(channel_path: str) -> bool:
+    """Wait for the first message. Returns True if message received, False if stopped."""
+    while not should_stop():
+        if count_messages(channel_path) > 0:
+            return True
+        time.sleep(0.3)
+    return False
+
+
+def wait_for_user_after_all_pass(channel_path: str, last_message_count: int) -> tuple[bool, int]:
+    """Wait for user input after all agents have passed.
+    
+    Returns (should_continue, new_last_message_count).
+    """
+    print("    [all agents passed - waiting for user input]")
+    while not should_stop():
+        time.sleep(0.5)
+        new_count = count_messages(channel_path)
+        if new_count == 0:  # Restart
+            return True, 0
+        if new_count > last_message_count:
+            last_author = get_last_author(channel_path)
+            if last_author == "User":
+                clear_agent_state()  # Reset pass history
+                return True, new_count
+    return False, last_message_count
+
+
+def process_agent_turn(agent: dict, channel_path: str, settings: dict, client: OpenAI, agents: list[dict]) -> str | None:
+    """Process a single agent's turn.
+    
+    Returns the response, or None if turn should be skipped.
+    """
+    channel_content = read_channel(channel_path)
+    
+    # Build global context
+    user_instructions = settings.get("global_prompt", "")
+    global_context = build_global_context(agents, agent["name"], user_instructions)
+    
+    # Update state to "thinking"
+    update_agent_state(agent["name"], "thinking")
+    
+    # Generate response
+    max_tokens = settings.get("max_tokens", 512)
+    model = agent.get("model", "gpt-4o")
+    reasoning_effort = agent.get("reasoning_effort", settings.get("default_reasoning_effort"))
+    
+    response = call_agent(
+        agent["name"], agent["prompt"], channel_content, 
+        max_tokens, model, client, global_context, reasoning_effort
+    )
+    
+    return response
+
+
+def handle_delay(settings: dict, channel_path: str, last_message_count: int):
+    """Handle delay between agent turns, with early exit conditions."""
+    delay = settings.get("delay_seconds", 0)
+    wait_start = time.time()
+    
+    while time.time() - wait_start < delay:
+        if should_stop():
+            break
+        settings = load_settings()
+        if settings.get("paused", False):
+            break
+        if count_messages(channel_path) > last_message_count:
+            break
+        if count_messages(channel_path) == 0:  # Restart
+            break
+        time.sleep(0.3)
+
+
+def run_conversation_loop(channel_path: str, client: OpenAI):
+    """Run the main conversation loop."""
+    current_turn = 0
+    last_message_count = count_messages(channel_path)
+    
+    while not should_stop():
+        settings = load_settings()
+        agents = settings.get("agents", [])
+        
+        # Check if paused or no agents
+        if settings.get("paused", False) or not agents:
+            time.sleep(0.5)
+            continue
+        
+        # Check for restart (channel was cleared)
+        current_count = count_messages(channel_path)
+        if current_count == 0:
+            print("\nConversation restarted. Waiting for first message...")
+            clear_agent_state()
+            last_message_count = 0
+            current_turn = 0
+            if not wait_for_first_message(channel_path):
+                break
+            print("Conversation started!\n")
+            current_count = count_messages(channel_path)
+            last_message_count = current_count
+        
+        # Check for new messages and update turn order
+        if current_count > last_message_count:
+            last_author = get_last_author(channel_path)
+            last_message_count = current_count
+            
+            if last_author == "User":
+                current_turn = 0
+            else:
+                for idx, agent in enumerate(agents):
+                    if agent["name"] == last_author:
+                        current_turn = (idx + 1) % len(agents)
+                        break
+        
+        # Get current agent
+        current_turn = current_turn % len(agents)
+        agent = agents[current_turn]
+        
+        # Process agent turn
+        response = process_agent_turn(agent, channel_path, settings, client, agents)
+        
+        # Check stop after generation
+        if should_stop():
+            update_agent_state(agent["name"], "idle")
+            break
+        
+        # Check if channel was cleared during generation
+        if count_messages(channel_path) == 0:
+            update_agent_state(agent["name"], "idle")
+            continue
+        
+        # Handle [PASS] response
+        if response and response.strip() == "[PASS]":
+            update_agent_state(agent["name"], "passed")
+            print(f"    {agent['name']}: [passed]")
+            current_turn = (current_turn + 1) % len(agents)
+            
+            # Check if all agents have passed
+            agent_names = [a["name"] for a in agents]
+            if all_agents_passed(agent_names):
+                should_continue, last_message_count = wait_for_user_after_all_pass(channel_path, last_message_count)
+                if not should_continue:
+                    break
+                current_turn = 0
+            continue
+        
+        # Append response to channel
+        message_index = count_messages(channel_path) + 1
+        append_message(channel_path, message_index, agent["name"], response)
+        update_agent_state(agent["name"], "responded")
+        
+        # Progress indicator
+        preview = response[:60].replace("\n", " ")
+        print(f"[{message_index}] {agent['name']}: {preview}...")
+        
+        last_message_count = message_index
+        current_turn = (current_turn + 1) % len(agents)
+        
+        # Handle delay
+        handle_delay(settings, channel_path, last_message_count)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run a multi-agent conversation via a shared channel."
@@ -333,194 +383,23 @@ def main():
         default="params.toml",
         help="Path to params file (default: params.toml)."
     )
-
     args = parser.parse_args()
-
-    # Load params from file
-    params = load_params(args.params)
-    channel_path = params.get("channel", CHANNEL_PATH)
-
-    # Build initial agents list from params
-    initial_agents = []
-    i = 1
-    while True:
-        key = f"agent{i}"
-        if key in params:
-            initial_agents.append({
-                "name": params[key]["name"],
-                "prompt": params[key]["prompt"]
-            })
-            i += 1
-        else:
-            break
-
-    # Initialize OpenAI client
-    client = OpenAI()
-
-    # Clear stop file, agent state, initialize settings
-    clear_stop()
-    clear_agent_state()
     
-    # Load existing settings (preserve UI-added agents) or use params.toml agents
-    existing_settings = load_settings()
-    if not existing_settings.get("agents"):
-        # No agents in settings, use params.toml agents
-        existing_settings["agents"] = initial_agents
-        save_settings(existing_settings)
+    # Initialize session
+    params, channel_path, client = initialize_session(args)
     
-    # Clear channel file
-    if os.path.exists(channel_path):
-        os.remove(channel_path)
-
-    # Start web server in background thread
-    server_thread = threading.Thread(target=start_server, daemon=True)
-    server_thread.start()
-    
-    print("Agent Zoo running at http://localhost:5000")
-    print("Send a message in the UI to start the conversation.\n")
-
     # Wait for first message
-    while not should_stop():
-        if count_messages(channel_path) > 0:
-            break
-        time.sleep(0.3)
-
-    if should_stop():
+    if not wait_for_first_message(channel_path):
         clear_stop()
         print("Stopped before conversation started.")
         return
-
+    
     print("Conversation started!\n")
-
-    # Main loop: runs until stopped
-    current_turn = 0
-    last_message_count = count_messages(channel_path)
-
-    while not should_stop():
-        # Load current settings (agents may have changed)
-        settings = load_settings()
-        agents = settings.get("agents", [])
-        
-        # Check if paused or no agents
-        if settings.get("paused", False) or not agents:
-            time.sleep(0.5)
-            continue
-        
-        # Check current message count (may have been reset by restart)
-        current_count = count_messages(channel_path)
-        
-        # Handle restart (channel was cleared)
-        if current_count == 0:
-            print("\nConversation restarted. Waiting for first message...")
-            clear_agent_state()
-            last_message_count = 0
-            current_turn = 0
-            while not should_stop() and count_messages(channel_path) == 0:
-                time.sleep(0.3)
-            if should_stop():
-                break
-            print("Conversation started!\n")
-            current_count = count_messages(channel_path)
-            last_message_count = current_count
-        
-        # Check if there's a new message
-        if current_count > last_message_count:
-            last_author = get_last_author(channel_path)
-            last_message_count = current_count
-            
-            # If User posted, reset to first agent
-            if last_author == "User":
-                current_turn = 0
-            else:
-                # Find which agent posted and move to next
-                for idx, agent in enumerate(agents):
-                    if agent["name"] == last_author:
-                        current_turn = (idx + 1) % len(agents)
-                        break
-        
-        # Get current agent (handle case where agents list changed)
-        current_turn = current_turn % len(agents)
-        agent = agents[current_turn]
-        
-        # Read current channel state
-        channel_content = read_channel(channel_path)
-
-        # Build global context for this agent
-        user_instructions = settings.get("global_prompt", "")
-        global_context = build_global_context(agents, agent["name"], user_instructions)
-
-        # Update state to "thinking"
-        update_agent_state(agent["name"], "thinking")
-
-        # Generate response
-        max_tokens = settings.get("max_tokens", 512)
-        model = agent.get("model", "gpt-4o")
-        reasoning_effort = agent.get("reasoning_effort", settings.get("default_reasoning_effort"))
-        response = call_agent(agent["name"], agent["prompt"], channel_content, max_tokens, model, client, global_context, reasoning_effort)
-
-        # Check stop again before writing
-        if should_stop():
-            update_agent_state(agent["name"], "idle")
-            break
-        
-        # Check if channel was cleared during generation
-        if count_messages(channel_path) == 0:
-            update_agent_state(agent["name"], "idle")
-            continue
-
-        # Check if agent passed
-        if response.strip() == "[PASS]":
-            update_agent_state(agent["name"], "passed")
-            print(f"    {agent['name']}: [passed]")
-            current_turn = (current_turn + 1) % len(agents)
-            
-            # Check if all agents have passed (conversation stuck)
-            agent_names = [a["name"] for a in agents]
-            if all_agents_passed(agent_names):
-                print("    [all agents passed - waiting for user input]")
-                # Wait for new user message before continuing
-                while not should_stop():
-                    time.sleep(0.5)
-                    new_count = count_messages(channel_path)
-                    if new_count == 0:  # Restart
-                        break
-                    if new_count > last_message_count:
-                        last_author = get_last_author(channel_path)
-                        if last_author == "User":
-                            last_message_count = new_count
-                            current_turn = 0
-                            clear_agent_state()  # Reset pass history
-                            break
-            continue
-
-        # Append to channel
-        message_index = count_messages(channel_path) + 1
-        append_message(channel_path, message_index, agent["name"], response)
-        update_agent_state(agent["name"], "responded")
-
-        # Progress indicator
-        preview = response[:60].replace("\n", " ")
-        print(f"[{message_index}] {agent['name']}: {preview}...")
-
-        last_message_count = message_index
-        current_turn = (current_turn + 1) % len(agents)
-
-        # Wait based on delay setting
-        delay = settings.get("delay_seconds", 0)
-        wait_start = time.time()
-        while time.time() - wait_start < delay:
-            if should_stop():
-                break
-            settings = load_settings()
-            if settings.get("paused", False):
-                break
-            if count_messages(channel_path) > last_message_count:
-                break
-            # Check for restart
-            if count_messages(channel_path) == 0:
-                break
-            time.sleep(0.3)
-
+    
+    # Run main loop
+    run_conversation_loop(channel_path, client)
+    
+    # Cleanup
     clear_stop()
     clear_agent_state()
     print(f"\nStopped. Conversation saved to {channel_path}")

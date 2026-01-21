@@ -11,26 +11,30 @@ Run agent_zoo.py in another terminal to see the conversation evolve.
 
 import json
 import os
-import re
 import time
 from flask import Flask, Response, render_template_string, request, jsonify
 
+import shared
+from shared import (
+    # Functions
+    load_settings, save_settings,
+    load_agent_state,
+    parse_channel, estimate_tokens,
+    count_messages as _count_messages,
+    append_message as _append_message,
+)
+
 app = Flask(__name__)
 
-CHANNEL_PATH = "channel.txt"
-STOP_FILE = ".stop"
-SETTINGS_FILE = ".settings.json"
-AGENT_STATE_FILE = ".agent_state.json"
-SEPARATOR = "=" * 80
-SUBSEPARATOR = "-" * 80
+# Wrapper functions for server.py's simpler API (no path parameter)
+def count_messages() -> int:
+    """Count messages in the channel."""
+    return _count_messages(shared.CHANNEL_PATH)
 
-DEFAULT_SETTINGS = {
-    "max_tokens": 512,
-    "delay_seconds": 0,
-    "paused": False,
-    "global_prompt": "",
-    "agents": []
-}
+def append_message(index: int, author: str, content: str) -> None:
+    """Append a message to the channel file."""
+    _append_message(shared.CHANNEL_PATH, index, author, content)
+
 
 HTML = """
 <!DOCTYPE html>
@@ -1343,93 +1347,6 @@ HTML = """
 """
 
 
-def load_settings() -> dict:
-    """Load settings from file."""
-    if os.path.exists(SETTINGS_FILE):
-        try:
-            with open(SETTINGS_FILE, "r") as f:
-                return {**DEFAULT_SETTINGS, **json.load(f)}
-        except Exception:
-            pass
-    return DEFAULT_SETTINGS.copy()
-
-
-def save_settings(settings: dict) -> None:
-    """Save settings to file."""
-    with open(SETTINGS_FILE, "w") as f:
-        json.dump(settings, f, indent=2)
-
-
-def estimate_tokens(text: str) -> int:
-    """Estimate token count (roughly 4 chars per token for English)."""
-    return len(text) // 4
-
-
-def load_agent_state() -> dict:
-    """Load agent state from file."""
-    if os.path.exists(AGENT_STATE_FILE):
-        try:
-            with open(AGENT_STATE_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {"current_agent": None, "state": "idle", "timestamp": 0, "pass_history": []}
-
-
-def parse_channel(content: str) -> list[dict]:
-    """Parse the channel file into a list of messages."""
-    if not content.strip():
-        return []
-    
-    messages = []
-    blocks = re.split(r'={80}\n', content)
-    
-    for block in blocks:
-        block = block.strip()
-        if not block:
-            continue
-        
-        lines = block.split('\n')
-        header_match = re.match(r'\[(\d+)\]\s+(.+)', lines[0])
-        if header_match:
-            index = int(header_match.group(1))
-            author = header_match.group(2).strip()
-            
-            content_start = 1
-            if len(lines) > 1 and lines[1].startswith('-' * 10):
-                content_start = 2
-            
-            content = '\n'.join(lines[content_start:]).strip()
-            
-            messages.append({
-                'index': index,
-                'author': author,
-                'content': content
-            })
-    
-    return messages
-
-
-def count_messages() -> int:
-    """Count messages in the channel."""
-    if not os.path.exists(CHANNEL_PATH):
-        return 0
-    with open(CHANNEL_PATH, 'r') as f:
-        content = f.read()
-    if not content.strip():
-        return 0
-    return content.count(SEPARATOR)
-
-
-def append_message(index: int, author: str, content: str) -> None:
-    """Append a message to the channel file."""
-    with open(CHANNEL_PATH, "a") as f:
-        f.write(f"{SEPARATOR}\n")
-        f.write(f"[{index}] {author}\n")
-        f.write(f"{SUBSEPARATOR}\n")
-        f.write(f"{content}\n\n")
-
-
 def watch_channel_and_state():
     """Generator that yields channel content and agent state when either changes."""
     last_content = None
@@ -1442,10 +1359,10 @@ def watch_channel_and_state():
             content = ""
             
             # Check channel file
-            if os.path.exists(CHANNEL_PATH):
-                mtime = os.path.getmtime(CHANNEL_PATH)
+            if os.path.exists(shared.CHANNEL_PATH):
+                mtime = os.path.getmtime(shared.CHANNEL_PATH)
                 if mtime != last_channel_mtime:
-                    with open(CHANNEL_PATH, 'r') as f:
+                    with open(shared.CHANNEL_PATH, 'r') as f:
                         content = f.read()
                     if content != last_content:
                         last_content = content
@@ -1460,8 +1377,8 @@ def watch_channel_and_state():
                 content = ""
             
             # Check agent state file
-            if os.path.exists(AGENT_STATE_FILE):
-                state_mtime = os.path.getmtime(AGENT_STATE_FILE)
+            if os.path.exists(shared.AGENT_STATE_FILE):
+                state_mtime = os.path.getmtime(shared.AGENT_STATE_FILE)
                 if state_mtime != last_state_mtime:
                     last_state_mtime = state_mtime
                     changed = True
@@ -1482,8 +1399,8 @@ def index():
 @app.route('/stream')
 def stream():
     def generate():
-        if os.path.exists(CHANNEL_PATH):
-            with open(CHANNEL_PATH, 'r') as f:
+        if os.path.exists(shared.CHANNEL_PATH):
+            with open(shared.CHANNEL_PATH, 'r') as f:
                 content = f.read()
         else:
             content = ""
@@ -1558,15 +1475,15 @@ def send():
 @app.route('/restart', methods=['POST'])
 def restart():
     """Clear the channel to restart the conversation."""
-    if os.path.exists(CHANNEL_PATH):
-        os.remove(CHANNEL_PATH)
+    if os.path.exists(shared.CHANNEL_PATH):
+        os.remove(shared.CHANNEL_PATH)
     return jsonify({'ok': True})
 
 
 @app.route('/stop', methods=['POST'])
 def stop():
     """Signal the agent loop to stop."""
-    with open(STOP_FILE, 'w') as f:
+    with open(shared.STOP_FILE, 'w') as f:
         f.write('stop')
     return jsonify({'ok': True})
 

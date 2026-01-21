@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import agent_zoo
 import server
+import shared
 
 
 class TestMessageContentEdgeCases:
@@ -17,9 +18,9 @@ class TestMessageContentEdgeCases:
         channel_file = tmp_path / "channel.txt"
         
         content = "Line 1\nLine 2\nLine 3"
-        agent_zoo.append_message(str(channel_file), 1, "User", content)
+        shared.append_message(str(channel_file), 1, "User", content)
         
-        result = agent_zoo.read_channel(str(channel_file))
+        result = shared.read_channel(str(channel_file))
         assert "Line 1" in result
         assert "Line 2" in result
         assert "Line 3" in result
@@ -29,14 +30,14 @@ class TestMessageContentEdgeCases:
         channel_file = tmp_path / "channel.txt"
         
         content = "a = b + c\n2 + 2 = 4\n" + "=" * 50
-        agent_zoo.append_message(str(channel_file), 1, "User", content)
+        shared.append_message(str(channel_file), 1, "User", content)
         
         # Should still have exactly 1 message
-        assert agent_zoo.count_messages(str(channel_file)) == 1
+        assert shared.count_messages(str(channel_file)) == 1
         
-        # Parse with server function
+        # Parse with shared function
         channel_content = channel_file.read_text()
-        messages = server.parse_channel(channel_content)
+        messages = shared.parse_channel(channel_content)
         assert len(messages) == 1
         assert "a = b + c" in messages[0]["content"]
 
@@ -45,9 +46,9 @@ class TestMessageContentEdgeCases:
         channel_file = tmp_path / "channel.txt"
         
         content = "[This is bracketed text] and [more brackets]"
-        agent_zoo.append_message(str(channel_file), 1, "User", content)
+        shared.append_message(str(channel_file), 1, "User", content)
         
-        author = agent_zoo.get_last_author(str(channel_file))
+        author = shared.get_last_author(str(channel_file))
         assert author == "User"
 
     def test_message_with_unicode(self, tmp_path):
@@ -55,9 +56,9 @@ class TestMessageContentEdgeCases:
         channel_file = tmp_path / "channel.txt"
         
         content = "Hello 世界! 🎉 Привет мир! Ñoño"
-        agent_zoo.append_message(str(channel_file), 1, "User", content)
+        shared.append_message(str(channel_file), 1, "User", content)
         
-        result = agent_zoo.read_channel(str(channel_file))
+        result = shared.read_channel(str(channel_file))
         assert "世界" in result
         assert "🎉" in result
         assert "Привет" in result
@@ -68,9 +69,9 @@ class TestMessageContentEdgeCases:
         channel_file = tmp_path / "channel.txt"
         
         content = "😀 👋 🚀 ❤️ 🎯 💡"
-        agent_zoo.append_message(str(channel_file), 1, "User", content)
+        shared.append_message(str(channel_file), 1, "User", content)
         
-        result = agent_zoo.read_channel(str(channel_file))
+        result = shared.read_channel(str(channel_file))
         assert "😀" in result
         assert "🚀" in result
 
@@ -79,19 +80,19 @@ class TestMessageContentEdgeCases:
         channel_file = tmp_path / "channel.txt"
         
         content = "x" * 100000  # 100KB message
-        agent_zoo.append_message(str(channel_file), 1, "User", content)
+        shared.append_message(str(channel_file), 1, "User", content)
         
-        result = agent_zoo.read_channel(str(channel_file))
+        result = shared.read_channel(str(channel_file))
         assert "x" * 100000 in result
 
     def test_empty_message_content(self, tmp_path):
         """Empty message content is handled."""
         channel_file = tmp_path / "channel.txt"
         
-        agent_zoo.append_message(str(channel_file), 1, "User", "")
+        shared.append_message(str(channel_file), 1, "User", "")
         
-        assert agent_zoo.count_messages(str(channel_file)) == 1
-        author = agent_zoo.get_last_author(str(channel_file))
+        assert shared.count_messages(str(channel_file)) == 1
+        author = shared.get_last_author(str(channel_file))
         assert author == "User"
 
 
@@ -102,36 +103,36 @@ class TestAuthorNameEdgeCases:
         """Author names with spaces are handled."""
         channel_file = tmp_path / "channel.txt"
         
-        agent_zoo.append_message(str(channel_file), 1, "Albert Einstein", "E=mc²")
+        shared.append_message(str(channel_file), 1, "Albert Einstein", "E=mc²")
         
-        author = agent_zoo.get_last_author(str(channel_file))
+        author = shared.get_last_author(str(channel_file))
         assert author == "Albert Einstein"
 
     def test_author_with_numbers(self, tmp_path):
         """Author names with numbers are handled."""
         channel_file = tmp_path / "channel.txt"
         
-        agent_zoo.append_message(str(channel_file), 1, "Bot123", "Hello")
+        shared.append_message(str(channel_file), 1, "Bot123", "Hello")
         
-        author = agent_zoo.get_last_author(str(channel_file))
+        author = shared.get_last_author(str(channel_file))
         assert author == "Bot123"
 
     def test_author_with_special_chars(self, tmp_path):
         """Author names with special characters are handled."""
         channel_file = tmp_path / "channel.txt"
         
-        agent_zoo.append_message(str(channel_file), 1, "Bot-v2.0", "Hello")
+        shared.append_message(str(channel_file), 1, "Bot-v2.0", "Hello")
         
-        author = agent_zoo.get_last_author(str(channel_file))
+        author = shared.get_last_author(str(channel_file))
         assert author == "Bot-v2.0"
 
     def test_author_with_unicode(self, tmp_path):
         """Author names with Unicode are handled."""
         channel_file = tmp_path / "channel.txt"
         
-        agent_zoo.append_message(str(channel_file), 1, "日本語Bot", "こんにちは")
+        shared.append_message(str(channel_file), 1, "日本語Bot", "こんにちは")
         
-        author = agent_zoo.get_last_author(str(channel_file))
+        author = shared.get_last_author(str(channel_file))
         assert author == "日本語Bot"
 
 
@@ -141,11 +142,11 @@ class TestChannelParsingEdgeCases:
     def test_parse_channel_missing_subseparator(self):
         """parse_channel handles missing subseparator."""
         # Header without subseparator
-        content = f"""{server.SEPARATOR}
+        content = f"""{shared.SEPARATOR}
 [1] User
 Hello, world!
 """
-        messages = server.parse_channel(content)
+        messages = shared.parse_channel(content)
         
         # Should still parse, content starts after header
         assert len(messages) == 1
@@ -153,14 +154,14 @@ Hello, world!
 
     def test_parse_channel_empty_blocks(self):
         """parse_channel handles empty blocks."""
-        content = f"""{server.SEPARATOR}
+        content = f"""{shared.SEPARATOR}
 
-{server.SEPARATOR}
+{shared.SEPARATOR}
 [1] User
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 Hello
 """
-        messages = server.parse_channel(content)
+        messages = shared.parse_channel(content)
         
         # Should only have the valid message
         assert len(messages) == 1
@@ -168,31 +169,31 @@ Hello
 
     def test_parse_channel_consecutive_separators(self):
         """parse_channel handles consecutive separators."""
-        content = f"""{server.SEPARATOR}
-{server.SEPARATOR}
-{server.SEPARATOR}
+        content = f"""{shared.SEPARATOR}
+{shared.SEPARATOR}
+{shared.SEPARATOR}
 [1] User
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 Hello
 """
-        messages = server.parse_channel(content)
+        messages = shared.parse_channel(content)
         
         # Should still parse the valid message
         assert len(messages) >= 1
 
     def test_parse_channel_malformed_header(self):
         """parse_channel handles malformed headers."""
-        content = f"""{server.SEPARATOR}
+        content = f"""{shared.SEPARATOR}
 This is not a valid header
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 Some content
 
-{server.SEPARATOR}
+{shared.SEPARATOR}
 [1] User
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 Valid message
 """
-        messages = server.parse_channel(content)
+        messages = shared.parse_channel(content)
         
         # Should only parse the valid message
         valid_messages = [m for m in messages if m.get("author")]
@@ -201,12 +202,12 @@ Valid message
 
     def test_parse_channel_negative_index(self):
         """parse_channel handles messages with unusual index values."""
-        content = f"""{server.SEPARATOR}
+        content = f"""{shared.SEPARATOR}
 [999] Bot
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 Message with large index
 """
-        messages = server.parse_channel(content)
+        messages = shared.parse_channel(content)
         
         assert len(messages) == 1
         assert messages[0]["index"] == 999
@@ -218,9 +219,9 @@ class TestSettingsValidationEdgeCases:
     @pytest.fixture
     def client(self, tmp_path, monkeypatch):
         """Create Flask test client with isolated files."""
-        monkeypatch.setattr(server, "SETTINGS_FILE", str(tmp_path / ".settings.json"))
-        monkeypatch.setattr(server, "CHANNEL_PATH", str(tmp_path / "channel.txt"))
-        monkeypatch.setattr(server, "STOP_FILE", str(tmp_path / ".stop"))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(tmp_path / ".settings.json"))
+        monkeypatch.setattr(shared, "CHANNEL_PATH", str(tmp_path / "channel.txt"))
+        monkeypatch.setattr(shared, "STOP_FILE", str(tmp_path / ".stop"))
         
         server.app.config["TESTING"] = True
         with server.app.test_client() as test_client:
@@ -230,7 +231,7 @@ class TestSettingsValidationEdgeCases:
     def settings_file(self, tmp_path, monkeypatch):
         """Isolated settings file path."""
         path = tmp_path / ".settings.json"
-        monkeypatch.setattr(server, "SETTINGS_FILE", str(path))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(path))
         return path
 
     def test_settings_with_negative_max_tokens(self, client, settings_file):
@@ -266,12 +267,12 @@ class TestSettingsValidationEdgeCases:
         """load_settings handles corrupted JSON gracefully."""
         settings_file = tmp_path / ".settings.json"
         settings_file.write_text("{invalid json content")
-        monkeypatch.setattr(server, "SETTINGS_FILE", str(settings_file))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(settings_file))
         
-        settings = server.load_settings()
+        settings = shared.load_settings()
         
         # Should return defaults
-        assert settings == server.DEFAULT_SETTINGS
+        assert settings == shared.DEFAULT_SETTINGS
 
 
 class TestAPIFailures:
@@ -311,7 +312,7 @@ class TestAPIFailures:
 
     def test_enrich_handles_api_error(self, tmp_path, monkeypatch):
         """POST /enrich handles API errors gracefully."""
-        monkeypatch.setattr(server, "SETTINGS_FILE", str(tmp_path / ".settings.json"))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(tmp_path / ".settings.json"))
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         
         server.app.config["TESTING"] = True
@@ -350,17 +351,17 @@ class TestFileErrorHandling:
         with patch("builtins.open", mock_open):
             with patch("os.path.exists", return_value=True):
                 with pytest.raises(PermissionError):
-                    agent_zoo.read_channel(str(channel_file))
+                    shared.read_channel(str(channel_file))
 
     def test_save_settings_handles_write_error(self, tmp_path, monkeypatch):
         """save_settings raises exception on write failure."""
         # Create a directory where file should be (can't write file with same name)
         settings_path = tmp_path / ".settings.json"
         settings_path.mkdir()
-        monkeypatch.setattr(agent_zoo, "SETTINGS_FILE", str(settings_path))
+        monkeypatch.setattr(shared, "SETTINGS_FILE", str(settings_path))
         
         with pytest.raises(Exception):
-            agent_zoo.save_settings({"test": "data"})
+            shared.save_settings({"test": "data"})
 
 
 class TestTokenEstimationEdgeCases:
@@ -370,7 +371,7 @@ class TestTokenEstimationEdgeCases:
         """estimate_tokens handles Unicode characters."""
         # Unicode characters may have different byte lengths
         text = "Hello 世界!"
-        result = server.estimate_tokens(text)
+        result = shared.estimate_tokens(text)
         
         # Should return a number based on character count
         assert result >= 0
@@ -378,14 +379,14 @@ class TestTokenEstimationEdgeCases:
     def test_estimate_tokens_with_emoji(self):
         """estimate_tokens handles emoji."""
         text = "🎉🎊🎈"
-        result = server.estimate_tokens(text)
+        result = shared.estimate_tokens(text)
         
         assert result >= 0
 
     def test_estimate_tokens_whitespace_only(self):
         """estimate_tokens handles whitespace-only strings."""
         text = "   \n\t\n   "
-        result = server.estimate_tokens(text)
+        result = shared.estimate_tokens(text)
         
         assert result >= 0
 
@@ -432,4 +433,3 @@ class TestContextBuildingEdgeCases:
         # Prefixes should be cleaned
         assert "Role:" not in result or "Bot1:" in result
         assert "A helpful assistant" in result or "helpful assistant" in result
-

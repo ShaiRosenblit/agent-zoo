@@ -4,16 +4,17 @@ import json
 import pytest
 
 import server
+import shared
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     """Create a Flask test client with isolated file paths."""
     # Isolate file paths to tmp_path
-    monkeypatch.setattr(server, "CHANNEL_PATH", str(tmp_path / "channel.txt"))
-    monkeypatch.setattr(server, "STOP_FILE", str(tmp_path / ".stop"))
-    monkeypatch.setattr(server, "SETTINGS_FILE", str(tmp_path / ".settings.json"))
-    monkeypatch.setattr(server, "AGENT_STATE_FILE", str(tmp_path / ".agent_state.json"))
+    monkeypatch.setattr(shared, "CHANNEL_PATH", str(tmp_path / "channel.txt"))
+    monkeypatch.setattr(shared, "STOP_FILE", str(tmp_path / ".stop"))
+    monkeypatch.setattr(shared, "SETTINGS_FILE", str(tmp_path / ".settings.json"))
+    monkeypatch.setattr(shared, "AGENT_STATE_FILE", str(tmp_path / ".agent_state.json"))
     
     server.app.config["TESTING"] = True
     with server.app.test_client() as test_client:
@@ -24,7 +25,7 @@ def client(tmp_path, monkeypatch):
 def settings_file(tmp_path, monkeypatch):
     """Provide path to isolated settings file."""
     path = tmp_path / ".settings.json"
-    monkeypatch.setattr(server, "SETTINGS_FILE", str(path))
+    monkeypatch.setattr(shared, "SETTINGS_FILE", str(path))
     return path
 
 
@@ -208,7 +209,7 @@ class TestSendMessage:
     def test_send_creates_message(self, client, tmp_path, monkeypatch):
         """POST /send creates a message in the channel."""
         channel_path = tmp_path / "channel.txt"
-        monkeypatch.setattr(server, "CHANNEL_PATH", str(channel_path))
+        monkeypatch.setattr(shared, "CHANNEL_PATH", str(channel_path))
         
         response = client.post(
             "/send",
@@ -228,7 +229,7 @@ class TestSendMessage:
     def test_send_increments_index(self, client, tmp_path, monkeypatch):
         """POST /send increments message index correctly."""
         channel_path = tmp_path / "channel.txt"
-        monkeypatch.setattr(server, "CHANNEL_PATH", str(channel_path))
+        monkeypatch.setattr(shared, "CHANNEL_PATH", str(channel_path))
         
         client.post("/send", json={"message": "First"})
         response = client.post("/send", json={"message": "Second"})
@@ -264,7 +265,7 @@ class TestRestart:
         """POST /restart removes the channel file."""
         channel_path = tmp_path / "channel.txt"
         channel_path.write_text("Some content")
-        monkeypatch.setattr(server, "CHANNEL_PATH", str(channel_path))
+        monkeypatch.setattr(shared, "CHANNEL_PATH", str(channel_path))
         
         response = client.post("/restart")
         
@@ -274,7 +275,7 @@ class TestRestart:
 
     def test_restart_succeeds_when_no_file(self, client, tmp_path, monkeypatch):
         """POST /restart succeeds even when channel file doesn't exist."""
-        monkeypatch.setattr(server, "CHANNEL_PATH", str(tmp_path / "nonexistent.txt"))
+        monkeypatch.setattr(shared, "CHANNEL_PATH", str(tmp_path / "nonexistent.txt"))
         
         response = client.post("/restart")
         
@@ -287,7 +288,7 @@ class TestStop:
     def test_stop_creates_stop_file(self, client, tmp_path, monkeypatch):
         """POST /stop creates the stop signal file."""
         stop_path = tmp_path / ".stop"
-        monkeypatch.setattr(server, "STOP_FILE", str(stop_path))
+        monkeypatch.setattr(shared, "STOP_FILE", str(stop_path))
         
         response = client.post("/stop")
         
@@ -329,17 +330,17 @@ class TestParseChannel:
 
     def test_parse_channel_empty(self):
         """parse_channel returns empty list for empty content."""
-        assert server.parse_channel("") == []
-        assert server.parse_channel("   \n\n  ") == []
+        assert shared.parse_channel("") == []
+        assert shared.parse_channel("   \n\n  ") == []
 
     def test_parse_channel_single_message(self):
         """parse_channel parses a single message."""
-        content = f"""{server.SEPARATOR}
+        content = f"""{shared.SEPARATOR}
 [1] User
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 Hello, world!
 """
-        messages = server.parse_channel(content)
+        messages = shared.parse_channel(content)
         
         assert len(messages) == 1
         assert messages[0]["index"] == 1
@@ -348,17 +349,17 @@ Hello, world!
 
     def test_parse_channel_multiple_messages(self):
         """parse_channel parses multiple messages."""
-        content = f"""{server.SEPARATOR}
+        content = f"""{shared.SEPARATOR}
 [1] User
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 First message
 
-{server.SEPARATOR}
+{shared.SEPARATOR}
 [2] Bot
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 Second message
 """
-        messages = server.parse_channel(content)
+        messages = shared.parse_channel(content)
         
         assert len(messages) == 2
         assert messages[0]["author"] == "User"
@@ -367,14 +368,14 @@ Second message
 
     def test_parse_channel_multiline_content(self):
         """parse_channel handles multiline message content."""
-        content = f"""{server.SEPARATOR}
+        content = f"""{shared.SEPARATOR}
 [1] User
-{server.SUBSEPARATOR}
+{shared.SUBSEPARATOR}
 Line 1
 Line 2
 Line 3
 """
-        messages = server.parse_channel(content)
+        messages = shared.parse_channel(content)
         
         assert "Line 1" in messages[0]["content"]
         assert "Line 2" in messages[0]["content"]
@@ -386,18 +387,18 @@ class TestEstimateTokens:
 
     def test_estimate_tokens_empty(self):
         """estimate_tokens returns 0 for empty string."""
-        assert server.estimate_tokens("") == 0
+        assert shared.estimate_tokens("") == 0
 
     def test_estimate_tokens_short_text(self):
         """estimate_tokens estimates correctly for short text."""
         # ~4 chars per token
-        result = server.estimate_tokens("Hello world")  # 11 chars
+        result = shared.estimate_tokens("Hello world")  # 11 chars
         assert result == 2  # 11 // 4 = 2
 
     def test_estimate_tokens_longer_text(self):
         """estimate_tokens estimates correctly for longer text."""
         text = "a" * 100
-        result = server.estimate_tokens(text)
+        result = shared.estimate_tokens(text)
         assert result == 25  # 100 // 4
 
 
@@ -406,21 +407,21 @@ class TestCountMessages:
 
     def test_count_messages_missing_file(self, tmp_path, monkeypatch):
         """count_messages returns 0 for missing file."""
-        monkeypatch.setattr(server, "CHANNEL_PATH", str(tmp_path / "nonexistent.txt"))
+        monkeypatch.setattr(shared, "CHANNEL_PATH", str(tmp_path / "nonexistent.txt"))
         assert server.count_messages() == 0
 
     def test_count_messages_empty_file(self, tmp_path, monkeypatch):
         """count_messages returns 0 for empty file."""
         channel = tmp_path / "channel.txt"
         channel.write_text("")
-        monkeypatch.setattr(server, "CHANNEL_PATH", str(channel))
+        monkeypatch.setattr(shared, "CHANNEL_PATH", str(channel))
         
         assert server.count_messages() == 0
 
     def test_count_messages_counts_separators(self, tmp_path, monkeypatch):
         """count_messages counts separator occurrences."""
         channel = tmp_path / "channel.txt"
-        monkeypatch.setattr(server, "CHANNEL_PATH", str(channel))
+        monkeypatch.setattr(shared, "CHANNEL_PATH", str(channel))
         
         # Add messages using append_message
         server.append_message(1, "User", "First")
@@ -447,9 +448,9 @@ class TestLoadAgentState:
 
     def test_load_agent_state_returns_defaults(self, tmp_path, monkeypatch):
         """load_agent_state returns defaults when file doesn't exist."""
-        monkeypatch.setattr(server, "AGENT_STATE_FILE", str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(shared, "AGENT_STATE_FILE", str(tmp_path / "nonexistent.json"))
         
-        state = server.load_agent_state()
+        state = shared.load_agent_state()
         
         assert state["current_agent"] is None
         assert state["state"] == "idle"
@@ -465,9 +466,9 @@ class TestLoadAgentState:
             "timestamp": 999,
             "pass_history": [{"agent": "OtherBot", "time": 888}]
         }))
-        monkeypatch.setattr(server, "AGENT_STATE_FILE", str(state_file))
+        monkeypatch.setattr(shared, "AGENT_STATE_FILE", str(state_file))
         
-        state = server.load_agent_state()
+        state = shared.load_agent_state()
         
         assert state["current_agent"] == "TestBot"
         assert state["state"] == "thinking"
@@ -478,9 +479,9 @@ class TestLoadAgentState:
         """load_agent_state returns defaults for corrupted file."""
         state_file = tmp_path / ".agent_state.json"
         state_file.write_text("invalid json {{")
-        monkeypatch.setattr(server, "AGENT_STATE_FILE", str(state_file))
+        monkeypatch.setattr(shared, "AGENT_STATE_FILE", str(state_file))
         
-        state = server.load_agent_state()
+        state = shared.load_agent_state()
         
         assert state["current_agent"] is None
         assert state["state"] == "idle"
@@ -513,4 +514,3 @@ class TestAgentIndicatorUI:
         assert b'renderAgentIndicators' in response.data
         assert b'clearAgentIndicators' in response.data
         assert b'agent_state' in response.data
-
