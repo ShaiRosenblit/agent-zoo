@@ -1092,7 +1092,7 @@ HTML = """
                     <span class="message-index">#${msg.index}</span>
                     <span class="message-author">${escapeHtml(msg.author)}</span>
                 </div>
-                <div class="message-content">${escapeHtml(msg.content)}</div>
+                <div class="message-content" dir="auto">${escapeHtml(msg.content)}</div>
             `;
             return div;
         }
