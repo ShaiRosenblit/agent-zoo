@@ -651,6 +651,11 @@ HTML = """
             color: var(--neutral-800);
             outline: none;
             transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+            resize: none;
+            min-height: 48px;
+            max-height: 150px;
+            overflow-y: auto;
+            line-height: 1.4;
         }
         
         #user-input:focus { border-color: var(--primary-500); background: var(--primary-50); }
@@ -859,7 +864,7 @@ HTML = """
                 <button id="stop-btn">Stop</button>
             </div>
             <div class="input-row">
-                <input type="text" id="user-input" placeholder="Type a message to interrupt the conversation..." />
+                <textarea id="user-input" placeholder="Type a message... (Shift+Enter for new line)" rows="1"></textarea>
                 <button id="send-btn">Send</button>
             </div>
         </div>
@@ -1251,7 +1256,10 @@ HTML = """
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
-                if (res.ok) userInput.value = '';
+                if (res.ok) {
+                    userInput.value = '';
+                    userInput.style.height = 'auto';
+                }
             } catch (e) {
                 console.error('Failed to send:', e);
             }
@@ -1262,7 +1270,18 @@ HTML = """
         }
         
         sendBtn.onclick = sendMessage;
-        userInput.onkeydown = (e) => { if (e.key === 'Enter') sendMessage(); };
+        userInput.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        };
+        
+        // Auto-resize textarea as user types
+        userInput.oninput = () => {
+            userInput.style.height = 'auto';
+            userInput.style.height = Math.min(userInput.scrollHeight, 150) + 'px';
+        };
         
         pauseBtn.onclick = async () => {
             isPaused = !isPaused;
