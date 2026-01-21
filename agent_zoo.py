@@ -189,7 +189,8 @@ def start_server():
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
     
-    app.run(debug=False, threaded=True, use_reloader=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True, use_reloader=False)
 
 
 # --- Main Loop Components ---
@@ -217,10 +218,11 @@ def initialize_session(args) -> tuple[dict, str, OpenAI]:
         os.remove(channel_path)
     
     # Start web server
+    port = int(os.environ.get('PORT', 5000))
     server_thread = threading.Thread(target=start_server, daemon=True)
     server_thread.start()
     
-    print("Agent Zoo running at http://localhost:5000")
+    print(f"Agent Zoo running at http://localhost:{port}")
     print("Send a message in the UI to start the conversation.\n")
     
     return params, channel_path, client

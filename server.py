@@ -1537,6 +1537,7 @@ Return ONLY the improved prompt text, no explanations."""
 
 if __name__ == '__main__':
     # For standalone use (not typical - prefer running agent_zoo.py)
-    print("Starting server at http://localhost:5000")
+    port = int(os.environ.get('PORT', 5000))
+    print(f"Starting server at http://localhost:{port}")
     print("Note: Run 'uv run agent_zoo.py' instead to start both server and agents")
-    app.run(debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

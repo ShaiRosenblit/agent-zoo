@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: agent-zoo
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python agent_zoo.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+
